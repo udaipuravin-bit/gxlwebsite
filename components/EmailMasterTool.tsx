@@ -1,5 +1,5 @@
 
-import React, { useState, useEffect, useRef, useCallback } from 'react';
+import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import { 
   ArrowLeft, 
   Code2, 
@@ -20,7 +20,7 @@ import {
   GripVertical,
   Search
 } from 'lucide-react';
-import Editor, { loader } from '@monaco-editor/react';
+import Editor from '@monaco-editor/react';
 import { processMimeContent } from '../services/mimeService';
 
 interface EmailMasterToolProps {
@@ -146,6 +146,8 @@ const EmailMasterTool: React.FC<EmailMasterToolProps> = ({ onBack, theme: initia
 
   const triggerFind = () => {
     if (editorRef.current) {
+      editorRef.current.focus();
+      // Directly run the find action from Monaco
       editorRef.current.trigger('keyboard', 'actions.find', {});
     }
   };
@@ -163,7 +165,7 @@ const EmailMasterTool: React.FC<EmailMasterToolProps> = ({ onBack, theme: initia
         { token: 'comment', foreground: '475569', fontStyle: 'italic' },
       ],
       colors: {
-        'editor.background': '#0f172a', // Slate 900
+        'editor.background': '#0f172a',
         'editor.foreground': '#94a3b8',
         'editorLineNumber.foreground': '#334155',
         'editorLineNumber.activeForeground': '#6366f1',
@@ -171,6 +173,9 @@ const EmailMasterTool: React.FC<EmailMasterToolProps> = ({ onBack, theme: initia
         'editor.selectionBackground': '#6366f140',
         'scrollbarSlider.background': '#33415550',
         'scrollbarSlider.hoverBackground': '#6366f150',
+        'editorWidget.background': '#1e293b',
+        'editorWidget.border': '#334155',
+        'input.background': '#0f172a'
       }
     });
   };
@@ -197,8 +202,40 @@ const EmailMasterTool: React.FC<EmailMasterToolProps> = ({ onBack, theme: initia
   const toolbarClasses = isDark ? 'bg-slate-900 border-slate-800 text-slate-100' : 'bg-white border-slate-200 text-slate-900';
   const paneClasses = isDark ? 'bg-slate-950' : 'bg-slate-50';
 
+  const editorOptions = useMemo(() => ({
+    fontSize: 13,
+    fontFamily: "'JetBrains Mono', 'Fira Code', monospace",
+    minimap: { enabled: false },
+    lineNumbers: "on" as const,
+    lineNumbersMinChars: 2,
+    lineDecorationsWidth: 0,
+    glyphMargin: false,
+    folding: false,
+    wordWrap: "on" as const,
+    scrollBeyondLastLine: false,
+    automaticLayout: true,
+    padding: { top: 10 },
+    smoothScrolling: true,
+    cursorSmoothCaretAnimation: "on" as const,
+    bracketPairColorization: { enabled: true },
+    suggest: { showWords: false, snippetsPreventQuickSuggestions: true },
+    quickSuggestions: false,
+    fixedOverflowWidgets: true, // Crucial for multi-pane layouts to allow widgets to escape container bounds
+    renderLineHighlight: "all" as const,
+    hideCursorInOverviewRuler: true,
+    scrollbar: {
+      vertical: 'visible' as const,
+      horizontal: 'visible' as const,
+      useShadows: false,
+      verticalHasArrows: false,
+      horizontalHasArrows: false,
+      verticalScrollbarSize: 10,
+      horizontalScrollbarSize: 10
+    }
+  }), []);
+
   return (
-    <div className={`h-[calc(100vh-64px)] flex flex-col overflow-hidden select-none ${isDark ? 'bg-slate-950 text-slate-100' : 'bg-slate-50 text-slate-900'}`}>
+    <div className={`h-[calc(100vh-64px)] flex flex-col overflow-hidden ${isDark ? 'bg-slate-950 text-slate-100' : 'bg-slate-50 text-slate-900'}`}>
       
       {/* Top Toolbar */}
       <header className={`shrink-0 h-14 px-4 flex items-center justify-between border-b shadow-sm z-[100] ${toolbarClasses}`}>
@@ -218,6 +255,7 @@ const EmailMasterTool: React.FC<EmailMasterToolProps> = ({ onBack, theme: initia
              <ToolButton onClick={resetEditor} icon={<RotateCcw size={14}/>} label="Reset" isDark={isDark} />
              <ToolButton onClick={() => { navigator.clipboard.writeText(code); setCopied(true); setTimeout(() => setCopied(false), 2000); }} icon={copied ? <Check size={14} className="text-emerald-500"/> : <Copy size={14}/>} label={copied ? "Copied" : "Copy"} isDark={isDark} />
              <ToolButton onClick={downloadHtml} icon={<Download size={14}/>} label="Export" isDark={isDark} />
+             <ToolButton onClick={triggerFind} icon={<Search size={14}/>} label="Find & Replace" isDark={isDark} />
           </div>
         </div>
 
@@ -230,27 +268,23 @@ const EmailMasterTool: React.FC<EmailMasterToolProps> = ({ onBack, theme: initia
           <button onClick={toggleTheme} className={`p-2 rounded-lg hover:bg-slate-500/10 transition-colors ${isDark ? 'text-yellow-400' : 'text-slate-600'}`}>
             {isDark ? <Sun size={18} /> : <Moon size={18} />}
           </button>
-          <button onClick={() => setJsEnabled(!jsEnabled)} className={`p-2 rounded-lg hover:bg-slate-500/10 transition-colors ${jsEnabled ? 'text-emerald-400' : 'text-slate-500'}`}>
+          <button onClick={() => setJsEnabled(!jsEnabled)} className={`p-2 rounded-lg hover:bg-slate-500/10 transition-colors ${jsEnabled ? 'text-emerald-400' : 'text-slate-50'}`}>
             {jsEnabled ? <Unlock size={18}/> : <Lock size={18}/>}
           </button>
         </div>
       </header>
 
       {/* Main Split Editor */}
-      <div ref={containerRef} className="flex-1 flex min-h-0 relative select-text">
+      <div ref={containerRef} className="flex-1 flex min-h-0 relative">
         
         {/* Editor Pane */}
-        <div style={{ width: `${splitPosition}%` }} className="h-full relative overflow-hidden flex flex-col bg-[#0f172a] transition-[width] duration-0">
-          <div className="h-8 bg-[#1e293b] flex items-center px-4 justify-between border-b border-slate-800 shrink-0">
+        <div style={{ width: `${splitPosition}%` }} className="h-full relative flex flex-col bg-[#0f172a] transition-[width] duration-0">
+          <div className="h-8 bg-[#1e293b] flex items-center px-4 justify-between border-b border-slate-800 shrink-0 select-none">
              <span className="text-[10px] font-black uppercase tracking-widest text-slate-500">Source Editor</span>
-             <div className="flex items-center gap-2">
-                <button onClick={triggerFind} className="p-1 text-slate-500 hover:text-indigo-400 transition-colors" title="Find (Ctrl+F)">
-                   <Search size={14} />
-                </button>
-                <span className="text-[9px] font-mono text-slate-600">HTML5</span>
-             </div>
+             <span className="text-[9px] font-mono text-slate-600">HTML5</span>
           </div>
-          <div className="flex-1 min-h-0">
+          {/* Ensure the editor container itself allows widget overflow and has high z-index stacking */}
+          <div className="flex-1 min-h-0 relative z-[10] overflow-visible">
             <Editor
               height="100%"
               defaultLanguage="html"
@@ -259,29 +293,13 @@ const EmailMasterTool: React.FC<EmailMasterToolProps> = ({ onBack, theme: initia
               onChange={(v) => setCode(v || '')}
               beforeMount={handleEditorWillMount}
               onMount={handleEditorDidMount}
-              options={{
-                fontSize: 13,
-                fontFamily: "'JetBrains Mono', 'Fira Code', monospace",
-                minimap: { enabled: false },
-                lineNumbers: "on",
-                lineNumbersMinChars: 2, // Slim line count column
-                lineDecorationsWidth: 0, // Minimize gutter thickness
-                wordWrap: "on",
-                scrollBeyondLastLine: false,
-                automaticLayout: true,
-                padding: { top: 10 },
-                smoothScrolling: true,
-                cursorSmoothCaretAnimation: "on",
-                bracketPairColorization: { enabled: true },
-                suggest: { showWords: false, snippetsPreventQuickSuggestions: true },
-                quickSuggestions: false,
-              }}
+              options={editorOptions}
             />
           </div>
         </div>
 
         {/* Resizer */}
-        <div onMouseDown={startResizing} onDoubleClick={() => setSplitPosition(50)} className={`w-1 h-full cursor-col-resize z-[150] flex items-center justify-center transition-all group shrink-0 ${isDark ? 'bg-slate-900 border-x border-slate-800' : 'bg-slate-200 border-x border-slate-300'} hover:bg-indigo-600`}>
+        <div onMouseDown={startResizing} onDoubleClick={() => setSplitPosition(50)} className={`w-1 h-full cursor-col-resize z-[150] flex items-center justify-center transition-all group shrink-0 select-none ${isDark ? 'bg-slate-900 border-x border-slate-800' : 'bg-slate-200 border-x border-slate-300'} hover:bg-indigo-600`}>
           <div className="w-4 h-8 bg-slate-800/50 rounded-md border border-slate-700/50 flex items-center justify-center group-hover:bg-indigo-700 transition-colors group-hover:scale-110">
             <GripVertical size={12} className="text-slate-400 group-hover:text-white" />
           </div>
@@ -291,7 +309,7 @@ const EmailMasterTool: React.FC<EmailMasterToolProps> = ({ onBack, theme: initia
         <div style={{ width: `${100 - splitPosition}%` }} className={`h-full flex flex-col relative transition-[width] duration-0 ${paneClasses}`}>
           {isResizing && <div className="absolute inset-0 z-[200] cursor-col-resize" />}
           
-          <div className={`h-8 px-4 flex items-center justify-between border-b shrink-0 ${isDark ? 'bg-slate-900 border-slate-800' : 'bg-white border-slate-200'}`}>
+          <div className={`h-8 px-4 flex items-center justify-between border-b shrink-0 select-none ${isDark ? 'bg-slate-900 border-slate-800' : 'bg-white border-slate-200'}`}>
              <div className="flex items-center gap-2">
                 <span className="text-[10px] font-black uppercase tracking-widest text-slate-500">Live Preview</span>
              </div>
@@ -315,13 +333,13 @@ const EmailMasterTool: React.FC<EmailMasterToolProps> = ({ onBack, theme: initia
         </div>
       </div>
 
-      <footer className={`shrink-0 h-6 px-4 flex items-center justify-between text-[9px] font-black uppercase tracking-widest border-t z-[100] ${toolbarClasses}`}>
+      <footer className={`shrink-0 h-6 px-4 flex items-center justify-between text-[9px] font-black uppercase tracking-widest border-t z-[100] select-none ${toolbarClasses}`}>
         <div className="flex gap-4">
            <span>Bytes: {new Blob([code]).size}</span>
            <span>Device: {previewMode}</span>
         </div>
         <div className="flex gap-2">
-           <span className="text-indigo-500">Authenticator Pro Lab</span>
+           <span className="text-indigo-500 text-[8px] tracking-tighter">AUTHENTICATOR PRO LAB • v3.0.4</span>
         </div>
       </footer>
     </div>
