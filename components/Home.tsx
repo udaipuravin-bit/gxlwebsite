@@ -19,7 +19,8 @@ import {
   Shield,
   Type,
   Lock,
-  Ghost
+  Ghost,
+  Sparkles
 } from 'lucide-react';
 
 interface HomeProps {
@@ -36,6 +37,7 @@ interface HomeProps {
   onLaunchIpGeo: () => void;
   onLaunchMimeEncoder: () => void;
   onLaunchSubjectEncoder: () => void;
+  onLaunchEmailMaster: () => void;
 }
 
 const Home: React.FC<HomeProps> = (props) => {
@@ -164,6 +166,15 @@ const Home: React.FC<HomeProps> = (props) => {
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-6 gap-4">
           <ToolCard 
             theme={props.theme}
+            onClick={props.onLaunchEmailMaster} 
+            icon={<Sparkles size={28} />} 
+            title="Email Master" 
+            desc="AI Forensic Engineer." 
+            colorClass="text-indigo-400"
+            glowClass="bg-indigo-500/10"
+          />
+          <ToolCard 
+            theme={props.theme}
             onClick={props.onLaunchWhois} 
             icon={<Calendar size={28} />} 
             title="Domain Expiry" 
@@ -188,15 +199,6 @@ const Home: React.FC<HomeProps> = (props) => {
             desc="Map IPs to locations." 
             colorClass="text-cyan-400"
             glowClass="bg-cyan-500/10"
-          />
-          <ToolCard 
-            theme={props.theme}
-            onClick={() => {}} 
-            icon={<Ghost size={28} />} 
-            title="Blacklist" 
-            desc="Check RBL lists." 
-            colorClass="text-rose-600"
-            glowClass="bg-rose-500/5"
           />
           <ToolCard 
             theme={props.theme}

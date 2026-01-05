@@ -196,3 +196,5 @@ export interface SubjectEncodingResult {
   encodings: Record<string, string>;
   espCompatibility: Record<string, 'supported' | 'partial' | 'unsupported'>;
 }
+
+export type EmailMasterAction = 'optimize' | 'fix' | 'decode' | 'validate' | 'write';

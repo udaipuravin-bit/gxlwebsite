@@ -14,8 +14,9 @@ import EmailHeaderTool from './components/EmailHeaderTool';
 import IpGeoTool from './components/IpGeoTool';
 import MimeEncoderTool from './components/MimeEncoderTool';
 import SubjectEncoderTool from './components/SubjectEncoderTool';
+import EmailMasterTool from './components/EmailMasterTool';
 
-type View = 'home' | 'dkim-checker' | 'dmarc-checker' | 'spf-validator' | 'dns-lookup' | 'mx-lookup' | 'whois-checker' | 'reverse-dns' | 'caa-checker' | 'email-header-analyzer' | 'ip-geolocation' | 'mime-encoder' | 'subject-encoder';
+type View = 'home' | 'dkim-checker' | 'dmarc-checker' | 'spf-validator' | 'dns-lookup' | 'mx-lookup' | 'whois-checker' | 'reverse-dns' | 'caa-checker' | 'email-header-analyzer' | 'ip-geolocation' | 'mime-encoder' | 'subject-encoder' | 'email-master';
 type Theme = 'dark' | 'light';
 
 const App: React.FC = () => {
@@ -31,7 +32,7 @@ const App: React.FC = () => {
   return (
     <div className={`min-h-screen transition-colors duration-300 ${isDark ? 'bg-slate-950 text-slate-100' : 'bg-slate-50 text-slate-900'} selection:bg-indigo-500/30`}>
       <Navbar 
-        onNavigate={(view) => setCurrentView(view)} 
+        onNavigate={(view) => setCurrentView(view as View)} 
         theme={theme} 
         onToggleTheme={toggleTheme} 
       />
@@ -52,6 +53,7 @@ const App: React.FC = () => {
             onLaunchIpGeo={() => setCurrentView('ip-geolocation')}
             onLaunchMimeEncoder={() => setCurrentView('mime-encoder')}
             onLaunchSubjectEncoder={() => setCurrentView('subject-encoder')}
+            onLaunchEmailMaster={() => setCurrentView('email-master')}
           />
         )}
         {currentView === 'dkim-checker' && <DkimTool theme={theme} onBack={() => setCurrentView('home')} />}
@@ -66,6 +68,7 @@ const App: React.FC = () => {
         {currentView === 'ip-geolocation' && <IpGeoTool theme={theme} onBack={() => setCurrentView('home')} />}
         {currentView === 'mime-encoder' && <MimeEncoderTool theme={theme} onBack={() => setCurrentView('home')} />}
         {currentView === 'subject-encoder' && <SubjectEncoderTool theme={theme} onBack={() => setCurrentView('home')} />}
+        {currentView === 'email-master' && <EmailMasterTool theme={theme} onBack={() => setCurrentView('home')} />}
       </main>
     </div>
   );

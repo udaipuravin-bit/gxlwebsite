@@ -20,7 +20,8 @@ import {
   Sun,
   Shield,
   Type,
-  Search as SearchIcon
+  Search as SearchIcon,
+  Sparkles
 } from 'lucide-react';
 
 interface NavbarProps {
@@ -49,6 +50,7 @@ const Navbar: React.FC<NavbarProps> = ({ onNavigate, theme, onToggleTheme }) => 
       { id: 'reverse-dns', name: 'Reverse DNS', icon: <Hash size={16} />, color: 'text-violet-400' },
     ],
     forensics: [
+      { id: 'email-master', name: 'Email Master', icon: <Sparkles size={16} />, color: 'text-indigo-400' },
       { id: 'email-header-analyzer', name: 'Header Forensic', icon: <FileText size={16} />, color: 'text-orange-400' },
       { id: 'ip-geolocation', name: 'IP Geolocation', icon: <MapPin size={16} />, color: 'text-cyan-400' },
       { id: 'whois-checker', name: 'Domain Expiry', icon: <Calendar size={16} />, color: 'text-lime-400' },
