@@ -1,5 +1,5 @@
 
-import React, { useState } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import { 
   ChevronDown, 
   ShieldCheck, 
@@ -19,7 +19,8 @@ import {
   Moon,
   Sun,
   Shield,
-  Type
+  Type,
+  Search as SearchIcon
 } from 'lucide-react';
 
 interface NavbarProps {
@@ -31,6 +32,9 @@ interface NavbarProps {
 const Navbar: React.FC<NavbarProps> = ({ onNavigate, theme, onToggleTheme }) => {
   const [isAllToolsOpen, setIsAllToolsOpen] = useState(false);
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
+  const [searchQuery, setSearchQuery] = useState('');
+  const [isSearchFocused, setIsSearchFocused] = useState(false);
+  const searchRef = useRef<HTMLDivElement>(null);
 
   const tools = {
     authentication: [
@@ -53,22 +57,41 @@ const Navbar: React.FC<NavbarProps> = ({ onNavigate, theme, onToggleTheme }) => 
     ]
   };
 
+  const allTools = Object.values(tools).flat();
+
+  const filteredTools = searchQuery.trim() 
+    ? allTools.filter(t => t.name.toLowerCase().includes(searchQuery.toLowerCase()))
+    : [];
+
   const handleNavigate = (view: string) => {
     onNavigate(view);
     setIsAllToolsOpen(false);
     setIsMobileMenuOpen(false);
+    setSearchQuery('');
+    setIsSearchFocused(false);
   };
+
+  // Close search results when clicking outside
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (searchRef.current && !searchRef.current.contains(event.target as Node)) {
+        setIsSearchFocused(false);
+      }
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
 
   const isDark = theme === 'dark';
 
   return (
     <nav className={`sticky top-0 z-50 border-b transition-colors duration-300 ${isDark ? 'bg-slate-900/80 border-slate-800 backdrop-blur-xl' : 'bg-white/90 border-slate-200 backdrop-blur-md'}`}>
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-        <div className="flex justify-between h-16 items-center">
+        <div className="flex justify-between h-16 items-center gap-4">
           {/* Logo */}
           <button 
             onClick={() => handleNavigate('home')} 
-            className="flex items-center gap-2 group"
+            className="flex items-center gap-2 group shrink-0"
           >
             <div className="bg-indigo-600 p-1.5 rounded-lg shadow-lg shadow-indigo-600/20 group-hover:scale-110 transition-transform">
               <Shield className="text-white" size={22} />
@@ -79,7 +102,7 @@ const Navbar: React.FC<NavbarProps> = ({ onNavigate, theme, onToggleTheme }) => 
           </button>
 
           {/* Desktop Nav */}
-          <div className="hidden lg:flex items-center gap-1 ml-8">
+          <div className="hidden lg:flex items-center gap-1 ml-4 flex-1">
             <NavButton onClick={() => handleNavigate('dkim-checker')} label="DKIM" active={false} theme={theme} />
             <NavButton onClick={() => handleNavigate('spf-validator')} label="SPF" active={false} theme={theme} />
             <NavButton onClick={() => handleNavigate('dmarc-checker')} label="DMARC" active={false} theme={theme} />
@@ -125,11 +148,59 @@ const Navbar: React.FC<NavbarProps> = ({ onNavigate, theme, onToggleTheme }) => 
             </div>
           </div>
 
-          {/* Right Actions */}
-          <div className="flex items-center gap-4">
+          {/* Right Actions: Search + Theme + Mobile Menu */}
+          <div className="flex items-center gap-2 md:gap-4 flex-1 justify-end">
+            {/* Search Input */}
+            <div className="relative w-full max-w-[120px] md:max-w-[240px]" ref={searchRef}>
+              <div className={`flex items-center gap-2 px-3 py-1.5 rounded-xl border transition-all ${
+                isDark 
+                  ? 'bg-slate-950 border-slate-800 focus-within:border-indigo-500 focus-within:ring-1 focus-within:ring-indigo-500/50' 
+                  : 'bg-slate-100 border-slate-200 focus-within:border-indigo-300 focus-within:ring-1 focus-within:ring-indigo-200'
+              }`}>
+                <SearchIcon size={16} className={isDark ? 'text-slate-500' : 'text-slate-400'} />
+                <input 
+                  type="text"
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  onFocus={() => setIsSearchFocused(true)}
+                  placeholder="Find tool..."
+                  className={`w-full bg-transparent border-none outline-none text-xs font-bold ${isDark ? 'text-slate-200 placeholder:text-slate-600' : 'text-slate-700 placeholder:text-slate-400'}`}
+                />
+              </div>
+
+              {/* Search Results Dropdown */}
+              {isSearchFocused && filteredTools.length > 0 && (
+                <div className={`absolute top-full mt-2 w-full max-w-[280px] right-0 shadow-2xl rounded-2xl border p-2 animate-in fade-in slide-in-from-top-1 duration-200 overflow-hidden ${
+                  isDark ? 'bg-slate-900 border-slate-800' : 'bg-white border-slate-200'
+                }`}>
+                  <div className="max-h-60 overflow-y-auto custom-scrollbar">
+                    {filteredTools.map(tool => (
+                      <button
+                        key={tool.id}
+                        onClick={() => handleNavigate(tool.id)}
+                        className={`w-full flex items-center gap-3 p-2.5 rounded-xl text-left transition-all group ${
+                          isDark ? 'hover:bg-slate-800' : 'hover:bg-slate-100'
+                        }`}
+                      >
+                        <div className={`p-2 rounded-lg ${isDark ? 'bg-slate-950' : 'bg-slate-50'} group-hover:scale-110 transition-transform`}>
+                          <span className={tool.color}>{tool.icon}</span>
+                        </div>
+                        <div>
+                          <p className={`text-[11px] font-black uppercase tracking-tight ${isDark ? 'text-slate-200' : 'text-slate-800'}`}>
+                            {tool.name}
+                          </p>
+                          <p className="text-[8px] text-slate-500 font-bold tracking-widest uppercase">Tool Module</p>
+                        </div>
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              )}
+            </div>
+
             <button 
               onClick={onToggleTheme}
-              className={`p-2 rounded-xl transition-all border ${isDark ? 'bg-slate-800 border-slate-700 text-yellow-400 hover:bg-slate-700' : 'bg-slate-100 border-slate-200 text-slate-600 hover:bg-slate-200'}`}
+              className={`p-2 rounded-xl transition-all border shrink-0 ${isDark ? 'bg-slate-800 border-slate-700 text-yellow-400 hover:bg-slate-700' : 'bg-slate-100 border-slate-200 text-slate-600 hover:bg-slate-200'}`}
               title="Toggle Theme"
             >
               {isDark ? <Sun size={18} /> : <Moon size={18} />}
@@ -137,7 +208,7 @@ const Navbar: React.FC<NavbarProps> = ({ onNavigate, theme, onToggleTheme }) => 
 
             {/* Mobile Toggle */}
             <button 
-              className={`lg:hidden p-2 rounded-lg ${isDark ? 'text-slate-400' : 'text-slate-600'}`}
+              className={`lg:hidden p-2 rounded-lg shrink-0 ${isDark ? 'text-slate-400' : 'text-slate-600'}`}
               onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
             >
               {isMobileMenuOpen ? <X size={24} /> : <Menu size={24} />}
