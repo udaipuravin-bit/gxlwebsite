@@ -1,0 +1,5 @@
+{
+  "name": "Bulk DKIM Checker",
+  "description": "A high-performance bulk DKIM lookup tool that allows users to verify DKIM records across multiple domains using custom selectors.",
+  "requestFramePermissions": []
+}
