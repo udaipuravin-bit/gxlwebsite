@@ -47,10 +47,10 @@ const SpamhausTool: React.FC<SpamhausToolProps> = ({ onBack, theme }) => {
   }, [inputLines]);
 
   const handleProcess = async () => {
-    const dqsKey = process.env.SPAMHAUS_DQS_KEY || '';
+    const dqsKey = import.meta.env.VITE_SPAMHAUS_DQS_KEY || '';
     
     if (!dqsKey) {
-      notify('error', 'SPAMHAUS_DQS_KEY is missing in environment.');
+      notify('error', 'VITE_SPAMHAUS_DQS_KEY is missing in environment.');
       return;
     }
 
