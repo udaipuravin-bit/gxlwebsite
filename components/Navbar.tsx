@@ -43,7 +43,7 @@ const Navbar: React.FC<NavbarProps> = ({ onNavigate, theme, onToggleTheme }) => 
       { id: 'dkim-checker', name: 'Bulk DKIM', icon: <ShieldCheck size={16} />, color: 'text-emerald-400' },
       { id: 'spf-validator', name: 'SPF Validator', icon: <Globe size={16} />, color: 'text-amber-400' },
       { id: 'dmarc-checker', name: 'DMARC Audit', icon: <BarChart3 size={16} />, color: 'text-sky-400' },
-      { id: 'spamhaus-checker', name: 'Spamhaus Blacklist', icon: <AlertOctagon size={16} />, color: 'text-rose-500' },
+      { id: 'spamhaus-checker', name: 'Spamhaus DQS', icon: <AlertOctagon size={16} />, color: 'text-rose-500' },
       { id: 'caa-checker', name: 'CAA Policy', icon: <FileCheck size={16} />, color: 'text-teal-400' },
     ],
     infrastructure: [
@@ -107,7 +107,6 @@ const Navbar: React.FC<NavbarProps> = ({ onNavigate, theme, onToggleTheme }) => 
             <NavButton onClick={() => handleNavigate('dkim-checker')} label="DKIM" theme={theme} />
             <NavButton onClick={() => handleNavigate('spf-validator')} label="SPF" theme={theme} />
             <NavButton onClick={() => handleNavigate('dmarc-checker')} label="DMARC" theme={theme} />
-            <NavButton onClick={() => handleNavigate('spamhaus-checker')} label="Spamhaus" theme={theme} />
             
             <div 
               className="relative"

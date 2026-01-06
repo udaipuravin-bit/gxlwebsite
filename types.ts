@@ -1,4 +1,5 @@
 
+
 export interface DkimResult {
   id: number;
   domain: string;
@@ -210,8 +211,8 @@ export interface SpamhausResult {
   status: 'clean' | 'listed-high' | 'listed-low' | 'pending' | 'loading' | 'error';
 }
 
-// Fix: Added missing RecordValidatorResult interface to resolve compilation error in RecordValidatorTool.tsx
-export interface RecordValidatorResult {
+// Added RecordMatchResult interface to resolve compilation errors in RecordValidatorTool and RecordMatcherTool.
+export interface RecordMatchResult {
   id: number;
   domain: string;
   hostname: string;

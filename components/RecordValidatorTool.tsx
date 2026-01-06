@@ -18,7 +18,8 @@ import {
   XCircle,
   AlertTriangle
 } from 'lucide-react';
-import { RecordValidatorResult } from '../types';
+// Changed from RecordValidatorResult to RecordMatchResult as per types.ts
+import { RecordMatchResult } from '../types';
 import { lookupRecordByType } from '../services/dnsService';
 import { useNotify } from '../App';
 
@@ -37,7 +38,8 @@ const RecordValidatorTool: React.FC<RecordValidatorToolProps> = ({ onBack, theme
   const [prefixInput, setPrefixInput] = useState('_dmarc');
   const [expectedValue, setExpectedValue] = useState('');
   const [isSecret, setIsSecret] = useState(false);
-  const [results, setResults] = useState<RecordValidatorResult[]>([]);
+  // Using RecordMatchResult instead of non-existent RecordValidatorResult
+  const [results, setResults] = useState<RecordMatchResult[]>([]);
   const [isProcessing, setIsProcessing] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   const [filterStatus, setFilterStatus] = useState<FilterStatus>('all');
@@ -57,7 +59,8 @@ const RecordValidatorTool: React.FC<RecordValidatorToolProps> = ({ onBack, theme
       domainsInput.split(/[\n,]/).map(d => d.trim().toLowerCase()).filter(d => d.length > 0)
     ));
 
-    const initialResults: RecordValidatorResult[] = domainList.map((domain, index) => {
+    // Using RecordMatchResult
+    const initialResults: RecordMatchResult[] = domainList.map((domain, index) => {
       const hostname = prefixInput.trim() ? `${prefixInput.trim()}.${domain}` : domain;
       return {
         id: index + 1,
@@ -81,7 +84,7 @@ const RecordValidatorTool: React.FC<RecordValidatorToolProps> = ({ onBack, theme
         const records = await lookupRecordByType(current.hostname, 'TXT');
         const found = records.map(r => r.value.replace(/"/g, '')).join(' ');
         
-        let status: RecordValidatorResult['status'] = 'missing';
+        let status: RecordMatchResult['status'] = 'missing';
         if (found) {
           status = found.includes(current.expected) ? 'match' : 'mismatch';
         }
@@ -305,7 +308,7 @@ const FilterTab: React.FC<{ active: boolean; onClick: () => void; label: string;
   );
 };
 
-const StatusBadge: React.FC<{ status: RecordValidatorResult['status'] }> = ({ status }) => {
+const StatusBadge: React.FC<{ status: RecordMatchResult['status'] }> = ({ status }) => {
   const styles = {
     match: 'bg-emerald-500/10 text-emerald-500 border-emerald-500/20',
     mismatch: 'bg-amber-500/10 text-amber-500 border-amber-500/20',

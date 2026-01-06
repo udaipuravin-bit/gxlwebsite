@@ -72,7 +72,6 @@ export const lookupDkimRecord = async (domain: string, selector: string): Promis
     }
     return null;
   } catch (error) {
-    console.error(`Error looking up DKIM for ${domain}:`, error);
     throw error;
   }
 };
@@ -88,7 +87,6 @@ export const lookupDmarcRecord = async (domain: string): Promise<string | null> 
     }
     return null;
   } catch (error) {
-    console.error(`Error looking up DMARC for ${domain}:`, error);
     throw error;
   }
 };
@@ -104,7 +102,6 @@ export const lookupSpfRecord = async (domain: string): Promise<string | null> =>
     }
     return null;
   } catch (error) {
-    console.error(`Error looking up SPF for ${domain}:`, error);
     throw error;
   }
 };
@@ -126,7 +123,6 @@ export const lookupRecordByType = async (domain: string, type: string): Promise<
     }
     return [];
   } catch (error) {
-    console.error(`Error looking up ${type} for ${domain}:`, error);
     throw error;
   }
 };
@@ -152,7 +148,6 @@ export const lookupCaaRecords = async (domain: string): Promise<CaaRecord[]> => 
     }
     return [];
   } catch (error) {
-    console.error(`Error looking up CAA for ${domain}:`, error);
     throw error;
   }
 };
@@ -176,7 +171,6 @@ export const lookupMxRecords = async (domain: string): Promise<MxRecord[]> => {
     }
     return [];
   } catch (error) {
-    console.error(`Error looking up MX for ${domain}:`, error);
     throw error;
   }
 };
@@ -193,138 +187,141 @@ export const lookupPtrRecord = async (ip: string): Promise<string | null> => {
     }
     return null;
   } catch (error) {
-    console.error(`Error looking up PTR for ${ip}:`, error);
     throw error;
   }
 };
 
 export const lookupWhoisData = async (domain: string): Promise<Omit<WhoisResult, 'id' | 'loadingStatus'> | null> => {
-  const queryUrl = `https://rdap.org/domain/${domain}`;
   try {
-    const response = await fetch(queryUrl);
+    const response = await fetch(`https://rdap.org/domain/${domain}`);
     if (!response.ok) return null;
+    
     const data = await response.json();
+    
     const events = data.events || [];
-    const expiration = events.find((e: any) => e.eventAction === 'expiration');
-    const registration = events.find((e: any) => e.eventAction === 'registration');
-    const entities = data.entities || [];
-    const registrarEntity = entities.find((e: any) => e.roles && e.roles.includes('registrar'));
-    let registrarName = 'Unknown';
-    if (registrarEntity && registrarEntity.vcardArray) {
-      const fnEntry = (registrarEntity.vcardArray[1] || []).find((entry: any) => entry[0] === 'fn');
-      if (fnEntry) registrarName = fnEntry[3];
-    }
-    const expiryDate = expiration ? expiration.eventDate : '';
-    const createdDate = registration ? registration.eventDate : '';
+    const createdEvent = events.find((e: any) => e.eventAction === 'registration');
+    const expiryEvent = events.find((e: any) => e.eventAction === 'expiration');
+    
+    const createdDate = createdEvent ? createdEvent.eventDate : '';
+    const expiryDate = expiryEvent ? expiryEvent.eventDate : '';
+    
     let daysRemaining = 0;
     if (expiryDate) {
-      const diff = new Date(expiryDate).getTime() - new Date().getTime();
-      daysRemaining = Math.ceil(diff / (1000 * 60 * 60 * 24));
+      const expiry = new Date(expiryDate);
+      const today = new Date();
+      const diffTime = expiry.getTime() - today.getTime();
+      daysRemaining = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
     }
+
+    const registrarEntity = (data.entities || []).find((e: any) => e.roles?.includes('registrar'));
+    const registrar = registrarEntity?.vcardArray?.[1]?.find((v: any) => v[0] === 'fn')?.[3] || 'Unknown';
+
     return {
-      domain, registrar: registrarName, createdDate, expiryDate, daysRemaining,
-      status: data.status || [], raw: data
+      domain,
+      registrar,
+      createdDate,
+      expiryDate,
+      daysRemaining,
+      status: data.status || [],
+      raw: data
     };
   } catch (error) {
-    console.error(`Error fetching WHOIS for ${domain}:`, error);
-    throw error;
+    return null;
   }
 };
 
+interface SpamhausQueryResult {
+  dataset: string;
+  listed: boolean;
+  reason: string;
+  codes: string[];
+}
+
+const getSpamhausReason = (code: string, dataset: string): string => {
+  const parts = code.split('.');
+  const last = parts[parts.length - 1];
+
+  if (dataset === 'ZEN') {
+    switch (last) {
+      case '2': return 'SBL - Spamhaus Block List';
+      case '3': return 'SBL-CSS - Spamhaus CSS';
+      case '4': return 'XBL - Exploits Block List';
+      case '9': return 'SBL-DROP - Spamhaus DROP';
+      case '10': return 'PBL - Policy Block List (ISP)';
+      case '11': return 'PBL - Policy Block List (Spamhaus)';
+      case '20': return 'AuthBL - Compromised Auth';
+      default: return 'Listed (ZEN)';
+    }
+  } else if (dataset === 'DBL') {
+    const codeNum = parseInt(last);
+    if (codeNum === 255) throw new Error('Misleading Query (Invalid DQS usage or domain formatting)');
+    if (codeNum >= 2 && codeNum <= 99) return 'Bad / Low Reputation';
+    if (codeNum >= 102 && codeNum <= 199) return 'Abused but Legitimate';
+    return 'Listed (DBL)';
+  } else if (dataset === 'ZRD') {
+    const hours = parseInt(last) - 2;
+    return `Zero Reputation Domain (Observed ${hours}-${hours + 1}h ago)`;
+  }
+  return 'Listed';
+};
+
 /**
- * Spamhaus Blacklist Query Implementation
- * Robust construction to handle both DQS and Public mirrors.
+ * Professional Spamhaus DQS Implementation.
+ * Uses <target>.<key>.<zone>.dq.spamhaus.net format.
+ * Strictly uses Google DNS resolvers via HTTP API.
  */
-export const lookupSpamhausReputation = async (input: string, type: 'ip' | 'domain', dqsKey: string): Promise<{ dataset: string; reason: string; codes: string[]; listed: boolean }[]> => {
-  const results: { dataset: string; reason: string; codes: string[]; listed: boolean }[] = [];
-  const cleanInput = input.trim().replace(/\.$/, '');
-  const cleanKey = dqsKey.trim();
+export const lookupSpamhausReputation = async (target: string, type: 'ip' | 'domain', dqsKey: string): Promise<SpamhausQueryResult[]> => {
+  if (!dqsKey) throw new Error('DQS Key is missing in environment.');
 
-  const dnsQuery = async (hostname: string) => {
+  const results: SpamhausQueryResult[] = [];
+  const zones = type === 'ip' 
+    ? [{ name: 'ZEN', host: 'zen.dq.spamhaus.net' }] 
+    : [
+        { name: 'DBL', host: 'dbl.dq.spamhaus.net' },
+        { name: 'ZRD', host: 'zrd.dq.spamhaus.net' }
+      ];
+
+  for (const zone of zones) {
+    let query = '';
+    if (type === 'ip') {
+      const reversedIp = target.split('.').reverse().join('.');
+      query = `${reversedIp}.${dqsKey}.${zone.host}`;
+    } else {
+      query = `${target}.${dqsKey}.${zone.host}`;
+    }
+
+    const url = `https://dns.google/resolve?name=${query}&type=A`;
     try {
-      const resp = await fetch(`https://dns.google/resolve?name=${hostname}&type=A`);
-      const data: DnsResponse = await resp.json();
-      if (data.Status === 5) throw new Error('Query Limit Exceeded or Unauthorized Key');
-      return data.Answer || [];
-    } catch (e: any) {
-      if (e.message.includes('Limit')) throw e;
-      return [];
-    }
-  };
-
-  if (type === 'ip') {
-    const reversedIp = cleanInput.split('.').reverse().join('.');
-    const zenHostname = cleanKey 
-      ? `${reversedIp}.${cleanKey}.zen.dq.spamhaus.net` 
-      : `${reversedIp}.zen.spamhaus.net`;
+      const res = await fetch(url);
+      const data: DnsResponse = await res.json();
       
-    const answers = await dnsQuery(zenHostname);
-    
-    if (answers.length > 0) {
-      const codes = answers.map(a => a.data);
-      const datasetParts: string[] = [];
-      const reasons: string[] = [];
-      
-      codes.forEach(code => {
-        if (code === '127.0.0.2') { datasetParts.push('SBL'); reasons.push('SBL (Spamhaus Block List)'); }
-        else if (code === '127.0.0.3') { datasetParts.push('SBL-CSS'); reasons.push('SBL-CSS (Spamhaus CSS)'); }
-        else if (code === '127.0.0.9') { datasetParts.push('DROP'); reasons.push('DROP (Don\'t Route Or Peer)'); }
-        else if (code === '127.0.0.4') { datasetParts.push('XBL'); reasons.push('XBL (Exploits Block List)'); }
-        else if (code === '127.0.0.10') { datasetParts.push('PBL'); reasons.push('PBL (Policy Block List - ISP)'); }
-        else if (code === '127.0.0.11') { datasetParts.push('PBL'); reasons.push('PBL (Policy Block List - SH)'); }
-        else if (code === '127.0.0.20') { datasetParts.push('AuthBL'); reasons.push('AuthBL (Authenticating Block List)'); }
-      });
-
-      results.push({
-        dataset: `ZEN (${[...new Set(datasetParts)].join(', ')})`,
-        reason: reasons.join(', '),
-        codes,
-        listed: true
-      });
-    }
-  } else {
-    // DBL Logic
-    const dblHostname = cleanKey 
-      ? `${cleanInput}.${cleanKey}.dbl.dq.spamhaus.net` 
-      : `${cleanInput}.dbl.spamhaus.net`;
-
-    const dblAnswers = await dnsQuery(dblHostname);
-    if (dblAnswers.length > 0) {
-      const codes = dblAnswers.map(a => a.data);
-      let reason = 'Bad / Low Reputation';
-      if (codes.some(c => {
-        const last = parseInt(c.split('.').pop() || '0');
-        return last >= 102 && last <= 199;
-      })) {
-        reason = 'Abused but Legitimate';
-      } else if (codes.some(c => c === '127.0.1.255')) {
-        reason = 'Invalid query (IP used instead of domain)';
-      }
-      results.push({ dataset: 'DBL', reason, codes, listed: true });
-    }
-
-    // ZRD Logic (ZRD is only available via DQS)
-    if (cleanKey) {
-      const zrdHostname = `${cleanInput}.${cleanKey}.zrd.dq.spamhaus.net`;
-      const zrdAnswers = await dnsQuery(zrdHostname);
-      if (zrdAnswers.length > 0) {
-        const codes = zrdAnswers.map(a => a.data);
-        const last = parseInt(codes[0].split('.').pop() || '0');
-        // 127.0.2.2 - 127.0.2.24
-        const hours = last - 2; 
-        results.push({ 
-          dataset: 'ZRD', 
-          reason: `Zero Reputation Domain (first observed ${hours} hours ago)`, 
-          codes, 
-          listed: true 
+      if (data.Status === 0 && data.Answer) {
+        const codes = data.Answer.map(ans => ans.data);
+        results.push({
+          dataset: zone.name,
+          listed: true,
+          reason: codes.map(c => getSpamhausReason(c, zone.name)).join(', '),
+          codes
+        });
+      } else if (data.Status === 3 || !data.Answer) { // NXDOMAIN
+        results.push({
+          dataset: zone.name,
+          listed: false,
+          reason: 'Not listed',
+          codes: []
+        });
+      } else {
+        results.push({
+          dataset: zone.name,
+          listed: false,
+          reason: 'Lookup error',
+          codes: []
         });
       }
+    } catch (e: any) {
+      // Catch "Misleading Query" or other logic errors from getSpamhausReason
+      throw new Error(e.message || 'DNS request failure');
     }
   }
-
-  if (results.length === 0) {
-    results.push({ dataset: 'None', reason: 'NOT LISTED', codes: [], listed: false });
-  }
-
   return results;
 };

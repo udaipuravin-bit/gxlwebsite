@@ -99,7 +99,7 @@ const SubjectEncoderTool: React.FC<SubjectEncoderToolProps> = ({ onBack, theme }
       addUnique(`Folded B64 (${size} Tab)`, chunks.join('\r\n\t'), 1);
     });
 
-    addUnique('Word-by-word B64', words.map(w => encodeRFC2047(w, 'B', cs)).join(' '), 1);
+    addUnique('Word-by-word B64', words.map(w => encodeRFC2047(String(w), 'B', cs)).join(' '), 1);
 
     // --- COLLECTION 2: QUOTED-PRINTABLE VARIANTS ---
     labelCasings.forEach((label) => {
@@ -122,8 +122,8 @@ const SubjectEncoderTool: React.FC<SubjectEncoderToolProps> = ({ onBack, theme }
     });
 
     // --- COLLECTION 3: MIXED B/Q SYNTHESIS ---
-    addUnique('B / Q Alternating Word', words.map((w, i) => encodeRFC2047(w, i % 2 === 0 ? 'B' : 'Q', cs)).join(' '), 3);
-    addUnique('Q / B Alternating Word', words.map((w, i) => encodeRFC2047(w, i % 2 === 0 ? 'Q' : 'B', cs)).join(' '), 3);
+    addUnique('B / Q Alternating Word', words.map((w, i) => encodeRFC2047(String(w), i % 2 === 0 ? 'B' : 'Q', cs)).join(' '), 3);
+    addUnique('Q / B Alternating Word', words.map((w, i) => encodeRFC2047(String(w), i % 2 === 0 ? 'Q' : 'B', cs)).join(' '), 3);
     addUnique('B Start / Q End', encodeRFC2047(subject.slice(0, mid), 'B', cs) + ' ' + encodeRFC2047(subject.slice(mid), 'Q', cs), 3);
     addUnique('Q Start / B End', encodeRFC2047(subject.slice(0, mid), 'Q', cs) + ' ' + encodeRFC2047(subject.slice(mid), 'B', cs), 3);
 
@@ -135,21 +135,22 @@ const SubjectEncoderTool: React.FC<SubjectEncoderToolProps> = ({ onBack, theme }
     addUnique('Interleaved B/Q Chunks', mixedChain.join(' '), 3);
 
     // --- COLLECTION 4: MULTI-CHARSET CHAINS ---
-    const primaryCharsets = ["UTF-8", "ISO-8859-1", "Windows-1252", "US-ASCII", "KOI8-R"];
-    // Fix: Explicitly cast array elements to string to satisfy encodeRFC2047 parameter expectations and avoid unknown type error
-    addUnique('UTF-8 + ISO Word Split', encodeRFC2047(words[0] as string, 'B', 'UTF-8') + ' ' + encodeRFC2047(words.slice(1).join(' ') as string, 'B', 'ISO-8859-1'), 4);
+    // Explicitly typing primaryCharsets to avoid 'unknown' inference
+    const primaryCharsets: string[] = ["UTF-8", "ISO-8859-1", "Windows-1252", "US-ASCII", "KOI8-R"];
+    // Using String() to ensure arguments are strings and avoid 'unknown' type issues
+    addUnique('UTF-8 + ISO Word Split', encodeRFC2047(String(words[0]), 'B', 'UTF-8') + ' ' + encodeRFC2047(words.slice(1).join(' '), 'B', 'ISO-8859-1'), 4);
     
-    // Fix: Explicitly type multiChain as string[] to prevent unknown assignment errors
+    // Explicitly typing multiChain as string[]
     let multiChain: string[] = [];
-    words.forEach((w, i) => {
+    words.forEach((w: string, i: number) => {
       const charset = primaryCharsets[i % primaryCharsets.length];
-      multiChain.push(encodeRFC2047(w, 'B', charset));
+      multiChain.push(encodeRFC2047(w, 'B', String(charset)));
     });
     addUnique('Rainbow Charset Word Chain', multiChain.join(' '), 4);
 
     // --- COLLECTION 5: FORENSIC & EDGE CASES ---
-    addUnique('Forensic: Single-Char B64', Array.from(subject.slice(0, 15)).map(c => encodeRFC2047(c, 'B', cs)).join(' '), 5);
-    addUnique('Forensic: Single-Char QP', Array.from(subject.slice(0, 15)).map(c => encodeRFC2047(c, 'Q', cs)).join(' '), 5);
+    addUnique('Forensic: Single-Char B64', Array.from(subject.slice(0, 15)).map(c => encodeRFC2047(String(c), 'B', cs)).join(' '), 5);
+    addUnique('Forensic: Single-Char QP', Array.from(subject.slice(0, 15)).map(c => encodeRFC2047(String(c), 'Q', cs)).join(' '), 5);
     addUnique('Forensic: Empty word gap', encodeRFC2047(subject.slice(0, mid), 'B', cs) + ' =?UTF-8?Q??= ' + encodeRFC2047(subject.slice(mid), 'B', cs), 5);
     addUnique('Edge: UTF8 Alias', encodeRFC2047(subject, 'B', 'UTF8'), 5);
     addUnique('Edge: Latin1 Alias', encodeRFC2047(subject, 'Q', 'latin1'), 5);

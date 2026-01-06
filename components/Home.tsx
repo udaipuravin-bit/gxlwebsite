@@ -5,7 +5,6 @@ import {
   Globe, 
   Zap, 
   BarChart3, 
-  ChevronRight, 
   Network, 
   Mail, 
   Calendar, 
@@ -54,26 +53,26 @@ const Home: React.FC<HomeProps> = (props) => {
         <h1 className={`text-5xl md:text-7xl font-black tracking-tight leading-tight ${isDark ? 'text-white' : 'text-slate-900'}`}>
           Bulk Security <span className="text-transparent bg-clip-text bg-gradient-to-r from-indigo-500 to-teal-400">& Intelligence</span>
         </h1>
-        <p className={`text-lg md:text-xl max-w-3xl mx-auto font-medium leading-relaxed ${isDark ? 'text-slate-400' : 'text-slate-600'}`}>
+        <h2 className={`text-lg md:text-xl max-w-3xl mx-auto font-medium leading-relaxed ${isDark ? 'text-slate-400' : 'text-slate-600'}`}>
           Professional toolsuite for bulk reputation auditing, protocol verification, and forensic domain analysis.
-        </p>
+        </h2>
       </header>
 
-      {/* Category 1: Global Reputation & Authentication */}
+      {/* Category 1: Reputation & Authentication */}
       <section className="mb-20">
         <div className="flex items-center gap-3 mb-10">
           <div className={`p-2 rounded-lg ${isDark ? 'bg-indigo-500/10 text-indigo-400' : 'bg-indigo-100 text-indigo-600'}`}>
             <Shield size={20} />
           </div>
-          <h2 className={`text-2xl font-black tracking-tight uppercase ${isDark ? 'text-white' : 'text-slate-800'}`}>Reputation & Auth</h2>
+          <h2 className={`text-2xl font-black tracking-tight uppercase ${isDark ? 'text-white' : 'text-slate-800'}`}>Reputation & Authentication</h2>
         </div>
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4">
           <ToolCard 
             theme={props.theme}
             onClick={props.onLaunchSpamhaus} 
             icon={<AlertOctagon size={32} />} 
-            title="Spamhaus Blacklist" 
-            desc="Bulk IP & Domain reputation check via professional blocklists." 
+            title="Spamhaus DQS" 
+            desc="Professional Datafeed IP & Domain reputation matrix." 
             colorClass="text-rose-500"
             glowClass="bg-rose-500/10"
           />
@@ -82,7 +81,7 @@ const Home: React.FC<HomeProps> = (props) => {
             onClick={props.onLaunchDkim} 
             icon={<ShieldCheck size={32} />} 
             title="Bulk DKIM" 
-            desc="Verify keys across domains with custom selector matrix." 
+            desc="Matrix lookup for multiple selectors and domains." 
             colorClass="text-emerald-400"
             glowClass="bg-emerald-500/10"
           />
@@ -104,10 +103,19 @@ const Home: React.FC<HomeProps> = (props) => {
             colorClass="text-amber-400"
             glowClass="bg-amber-500/10"
           />
+          <ToolCard 
+            theme={props.theme}
+            onClick={props.onLaunchCaa} 
+            icon={<FileCheck size={32} />} 
+            title="CAA Policy" 
+            desc="Audit certificate authority restriction policies." 
+            colorClass="text-teal-400"
+            glowClass="bg-teal-500/10"
+          />
         </div>
       </section>
 
-      {/* Category 2: Infrastructure Intelligence */}
+      {/* Category 2: Infrastructure */}
       <section className="mb-20">
         <div className="flex items-center gap-3 mb-10">
           <div className={`p-2 rounded-lg ${isDark ? 'bg-sky-500/10 text-sky-400' : 'bg-sky-100 text-sky-600'}`}>
@@ -115,7 +123,7 @@ const Home: React.FC<HomeProps> = (props) => {
           </div>
           <h2 className={`text-2xl font-black tracking-tight uppercase ${isDark ? 'text-white' : 'text-slate-800'}`}>Infrastructure</h2>
         </div>
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
           <ToolCard 
             theme={props.theme}
             onClick={props.onLaunchMx} 
@@ -143,25 +151,16 @@ const Home: React.FC<HomeProps> = (props) => {
             colorClass="text-blue-400"
             glowClass="bg-blue-500/10"
           />
-          <ToolCard 
-            theme={props.theme}
-            onClick={props.onLaunchCaa} 
-            icon={<FileCheck size={32} />} 
-            title="CAA Policy" 
-            desc="Audit certificate authority restriction policies." 
-            colorClass="text-teal-400"
-            glowClass="bg-teal-500/10"
-          />
         </div>
       </section>
 
-      {/* Category 3: Forensic Studio */}
+      {/* Category 3: Forensic Tools */}
       <section className="mb-24">
         <div className="flex items-center gap-3 mb-10">
           <div className={`p-2 rounded-lg ${isDark ? 'bg-emerald-500/10 text-emerald-400' : 'bg-emerald-100 text-emerald-600'}`}>
             <Activity size={20} />
           </div>
-          <h2 className={`text-2xl font-black tracking-tight uppercase ${isDark ? 'text-white' : 'text-slate-800'}`}>Forensic Studio</h2>
+          <h2 className={`text-2xl font-black tracking-tight uppercase ${isDark ? 'text-white' : 'text-slate-800'}`}>Forensic Tools</h2>
         </div>
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-6 gap-4">
           <ToolCard 
@@ -224,7 +223,7 @@ const Home: React.FC<HomeProps> = (props) => {
       {/* Footer Branding */}
       <footer className={`text-center pb-12 border-t pt-16 ${isDark ? 'border-slate-900' : 'border-slate-200'}`}>
         <p className="text-slate-500 text-[11px] font-bold uppercase tracking-widest">
-          © {new Date().getFullYear()} Authenticator Pro • Automated Domain Intelligence v3.0.5
+          © {new Date().getFullYear()} Authenticator Pro • Automated Domain Intelligence v4.0.0
         </p>
       </footer>
     </div>
