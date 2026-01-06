@@ -36,7 +36,7 @@ const SpamhausTool: React.FC<SpamhausToolProps> = ({ onBack, theme }) => {
   const [results, setResults] = useState<SpamhausResult[]>([]);
   const [isProcessing, setIsProcessing] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
-  const [showInstructions, setShowInstructions] = useState(true);
+  const [showInstructions, setShowInstructions] = useState(false);
 
   const inputLines = useMemo(() => {
     return input.split(/\n/).map(l => l.trim()).filter(l => l.length > 0);

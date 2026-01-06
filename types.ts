@@ -1,5 +1,3 @@
-
-
 export interface DkimResult {
   id: number;
   domain: string;
@@ -198,8 +196,6 @@ export interface SubjectEncodingResult {
   espCompatibility: Record<string, 'supported' | 'partial' | 'unsupported'>;
 }
 
-export type EmailMasterAction = 'optimize' | 'fix' | 'decode' | 'validate' | 'write';
-
 export interface SpamhausResult {
   id: number;
   input: string;
@@ -220,3 +216,9 @@ export interface RecordMatchResult {
   found: string;
   status: 'pending' | 'loading' | 'match' | 'mismatch' | 'missing' | 'error';
 }
+
+// Fixed missing EmailMasterAction export
+/**
+ * Action types supported by the Email Master tool for AI processing.
+ */
+export type EmailMasterAction = 'optimize' | 'fix' | 'decode' | 'validate' | 'write';

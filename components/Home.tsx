@@ -1,4 +1,3 @@
-
 import React from 'react';
 import { 
   ShieldCheck, 
@@ -17,7 +16,7 @@ import {
   SearchCode,
   Shield,
   Type,
-  Sparkles,
+  FileCode2,
   AlertOctagon
 } from 'lucide-react';
 
@@ -166,7 +165,7 @@ const Home: React.FC<HomeProps> = (props) => {
           <ToolCard 
             theme={props.theme}
             onClick={props.onLaunchEmailMaster} 
-            icon={<Sparkles size={28} />} 
+            icon={<FileCode2 size={28} />} 
             title="Email Master" 
             desc="Professional HTML/MIME editor." 
             colorClass="text-indigo-400"
