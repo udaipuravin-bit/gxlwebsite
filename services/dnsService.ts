@@ -1,3 +1,4 @@
+
 import { DnsResponse, DnsLookupEntry, MxRecord, WhoisResult, PtrResult, CaaRecord } from '../types';
 
 const RECORD_TYPE_MAP: Record<string, number> = {
@@ -15,179 +16,108 @@ const RECORD_TYPE_MAP: Record<string, number> = {
 // Internal DQS Master Key
 const DQS_INTERNAL_KEY = 'cnrmf6qnuzmpx57lve7mtvhr2q';
 
-// Updated PHP API Base URL as requested
+// Backend PHP API Base URL
 const PHP_API_URL = 'https://shadow-7dfgdfx.serv00.net/ipchecker';
 
-// Token Caching
+/**
+ * Token Caching Mechanism
+ */
 let cachedToken: string | null = null;
 let tokenExpiry: number = 0;
 
-const getCaaDescription = (tag: string, value: string): string => {
-  const cleanTag = tag.toLowerCase();
-  const cleanValue = value.replace(/"/g, '');
-  if (cleanTag === 'issue') return `Only ${cleanValue} is authorized to issue certificates.`;
-  if (cleanTag === 'issuewild') return `Only ${cleanValue} is authorized to issue wildcard certificates.`;
-  if (cleanTag === 'iodef') return `Unauthorized issuance requests will be reported to ${cleanValue}.`;
-  if (cleanTag === 'contactemail') return `CAs can contact the domain owner via ${cleanValue}.`;
-  if (cleanTag === 'contactphone') return `CAs can contact the owner at ${cleanValue}.`;
-  return `Custom policy defined for property: ${tag}.`;
-};
+/**
+ * Fetches or returns a cached Spamhaus API Token
+ */
+const getSpamhausToken = async (): Promise<string | null> => {
+  const now = Date.now();
+  // Return cached token if valid (cache for 20 minutes)
+  if (cachedToken && now < tokenExpiry) return cachedToken;
 
-const detectProvider = (hostname: string): string => {
-  const host = hostname.toLowerCase();
-  if (host.includes('google.com') || host.includes('googlemail.com')) return 'Google Workspace';
-  if (host.includes('outlook.com') || host.includes('protection.outlook.com')) return 'Microsoft 365';
-  if (host.includes('zoho.com') || host.includes('zoho.eu')) return 'Zoho Mail';
-  if (host.includes('amazonaws.com')) return 'Amazon SES';
-  if (host.includes('yahoodns.net') || host.includes('yahoo.com')) return 'Yahoo';
-  if (host.includes('secureserver.net')) return 'GoDaddy';
-  if (host.includes('mimecast.com')) return 'Mimecast';
-  if (host.includes('pphosted.com')) return 'Proofpoint';
-  if (host.includes('icloud.com') || host.includes('apple.com')) return 'Apple iCloud';
-  if (host.includes('protonmail.ch') || host.includes('proton.me')) return 'Proton Mail';
-  if (host.includes('fastmail.com')) return 'Fastmail';
-  if (host.includes('mailgun.org')) return 'Mailgun';
-  if (host.includes('sendgrid.net')) return 'SendGrid';
-  if (host.includes('mandrillapp.com')) return 'Mandrill';
-  return 'Custom / Private';
-};
-
-const ipToArpa = (ip: string): string | null => {
-  const ipv4Regex = /^(\d{1,3}\.){3}\d{1,3}$/;
-  if (ipv4Regex.test(ip)) return ip.split('.').reverse().join('.') + '.in-addr.arpa';
-  return null;
-};
-
-const reverseIpv6 = (ip: string): string => {
-  const parts = ip.split(':');
-  let expanded = '';
-  for (const part of parts) {
-    if (part === '') {
-      const missing = 8 - parts.filter(p => p !== '').length;
-      expanded += '0000'.repeat(missing);
-    } else expanded += part.padStart(4, '0');
+  try {
+    const res = await fetch(`${PHP_API_URL}/spamhaus-auth.php?action=get_token`, {
+      headers: {
+        'Referer': window.location.origin
+      }
+    });
+    const data = await res.json();
+    if (data && data.token && !data.error) {
+      cachedToken = data.token;
+      tokenExpiry = now + (1000 * 60 * 20); 
+      return cachedToken;
+    }
+    return null;
+  } catch (e) {
+    console.error("Token fetch failed:", e);
+    return null;
   }
-  return expanded.split('').reverse().join('.');
 };
 
-export const lookupDkimRecord = async (domain: string, selector: string): Promise<string | null> => {
-  const queryUrl = `https://dns.google/resolve?name=${selector}._domainkey.${domain}&type=TXT`;
-  try {
-    const response = await fetch(queryUrl);
-    const data: DnsResponse = await response.json();
-    if (data.Status === 0 && data.Answer) return data.Answer.map(ans => ans.data.replace(/"/g, '')).join('');
-    return null;
-  } catch (error) { throw error; }
+/**
+ * Format Date exactly as requested: Tue, 06 Jan 2026 6:25 PM IST
+ */
+const formatDate = (unix: number): string => {
+  const d = new Date(unix * 1000);
+  
+  // Format parts manually to ensure strict compliance with "Tue, 06 Jan 2026 6:25 PM IST"
+  const formatter = new Intl.DateTimeFormat('en-GB', {
+    weekday: 'short',
+    day: '2-digit',
+    month: 'short',
+    year: 'numeric',
+    hour: 'numeric',
+    minute: '2-digit',
+    hour12: true,
+    timeZone: 'Asia/Kolkata'
+  });
+
+  const parts = formatter.formatToParts(d);
+  const findPart = (type: string) => parts.find(p => p.type === type)?.value || '';
+
+  const weekday = findPart('weekday');
+  const day = findPart('day');
+  const month = findPart('month');
+  const year = findPart('year');
+  const hour = findPart('hour');
+  const minute = findPart('minute');
+  const ampm = findPart('dayPeriod').toUpperCase();
+
+  return `${weekday}, ${day} ${month} ${year} ${hour}:${minute} ${ampm} IST`;
 };
 
-export const lookupDmarcRecord = async (domain: string): Promise<string | null> => {
-  const queryUrl = `https://dns.google/resolve?name=_dmarc.${domain}&type=TXT`;
-  try {
-    const response = await fetch(queryUrl);
-    const data: DnsResponse = await response.json();
-    if (data.Status === 0 && data.Answer) {
-      return data.Answer.map(ans => ans.data.replace(/"/g, '')).find(txt => txt.toUpperCase().startsWith('V=DMARC1')) || null;
+/**
+ * DNSBL Reputation Logic
+ */
+export const lookupSpamhausReputation = async (target: string, type: 'ip' | 'domain') => {
+  const zones = type === 'ip' ? [{ name: 'ZEN', host: 'zen.dq.spamhaus.net' }] : [{ name: 'DBL', host: 'dbl.dq.spamhaus.net' }];
+  const results = [];
+
+  for (const zone of zones) {
+    let query = type === 'ip' 
+      ? (target.includes(':') ? `${reverseIpv6(target)}.${DQS_INTERNAL_KEY}.${zone.host}` : `${target.split('.').reverse().join('.')}.${DQS_INTERNAL_KEY}.${zone.host}`)
+      : `${target}.${DQS_INTERNAL_KEY}.${zone.host}`;
+
+    const url = `https://dns.google/resolve?name=${query}&type=A`;
+    try {
+      const res = await fetch(url);
+      const data: DnsResponse = await res.json();
+      if (data.Status === 0 && data.Answer) {
+        const codes = data.Answer.map(ans => ans.data);
+        results.push({
+          dataset: zone.name,
+          lists: codes.flatMap(c => getSpamhausListNames(c, zone.name)),
+          listed: true,
+          reason: codes.map(c => getSpamhausReason(c, zone.name)).join(', '),
+          codes
+        });
+      } else {
+        results.push({ dataset: zone.name, lists: [], listed: false, reason: 'Not listed', codes: [] });
+      }
+    } catch (e) {
+      throw new Error('DQS Resolve failure');
     }
-    return null;
-  } catch (error) { throw error; }
+  }
+  return results;
 };
-
-export const lookupSpfRecord = async (domain: string): Promise<string | null> => {
-  const queryUrl = `https://dns.google/resolve?name=${domain}&type=TXT`;
-  try {
-    const response = await fetch(queryUrl);
-    const data: DnsResponse = await response.json();
-    if (data.Status === 0 && data.Answer) {
-      return data.Answer.map(ans => ans.data.replace(/"/g, '')).find(txt => txt.toLowerCase().startsWith('v=spf1')) || null;
-    }
-    return null;
-  } catch (error) { throw error; }
-};
-
-export const lookupRecordByType = async (domain: string, type: string): Promise<DnsLookupEntry[]> => {
-  const typeId = RECORD_TYPE_MAP[type];
-  if (!typeId) return [];
-  const queryUrl = `https://dns.google/resolve?name=${domain}&type=${typeId}`;
-  try {
-    const response = await fetch(queryUrl);
-    const data: DnsResponse = await response.json();
-    if (data.Status === 0 && data.Answer) return data.Answer.map(ans => ({ type, name: ans.name, value: ans.data, ttl: ans.TTL }));
-    return [];
-  } catch (error) { throw error; }
-};
-
-export const lookupCaaRecords = async (domain: string): Promise<CaaRecord[]> => {
-  const queryUrl = `https://dns.google/resolve?name=${domain}&type=257`;
-  try {
-    const response = await fetch(queryUrl);
-    const data: DnsResponse = await response.json();
-    if (data.Status === 0 && data.Answer) {
-      return data.Answer.map(ans => {
-        const parts = ans.data.split(/\s+/);
-        const flag = parseInt(parts[0], 10);
-        const tag = parts[1];
-        const value = parts.slice(2).join(' ').replace(/"/g, '');
-        return { flag, tag, value, description: getCaaDescription(tag, value) };
-      });
-    }
-    return [];
-  } catch (error) { throw error; }
-};
-
-export const lookupMxRecords = async (domain: string): Promise<MxRecord[]> => {
-  const queryUrl = `https://dns.google/resolve?name=${domain}&type=15`;
-  try {
-    const response = await fetch(queryUrl);
-    const data: DnsResponse = await response.json();
-    if (data.Status === 0 && data.Answer) {
-      return data.Answer.map(ans => {
-        const parts = ans.data.split(/\s+/);
-        return { priority: parseInt(parts[0], 10), exchange: (parts[1] || '').replace(/\.$/, ''), provider: detectProvider(parts[1] || '') };
-      }).sort((a, b) => a.priority - b.priority);
-    }
-    return [];
-  } catch (error) { throw error; }
-};
-
-export const lookupPtrRecord = async (ip: string): Promise<string | null> => {
-  const arpaName = ipToArpa(ip);
-  if (!arpaName) return null;
-  const queryUrl = `https://dns.google/resolve?name=${arpaName}&type=12`;
-  try {
-    const response = await fetch(queryUrl);
-    const data: DnsResponse = await response.json();
-    if (data.Status === 0 && data.Answer && data.Answer.length > 0) return data.Answer[0].data.replace(/\.$/, '');
-    return null;
-  } catch (error) { throw error; }
-};
-
-export const lookupWhoisData = async (domain: string): Promise<Omit<WhoisResult, 'id' | 'loadingStatus'> | null> => {
-  try {
-    const response = await fetch(`https://rdap.org/domain/${domain}`);
-    if (!response.ok) return null;
-    const data = await response.json();
-    const createdEvent = (data.events || []).find((e: any) => e.eventAction === 'registration');
-    const expiryEvent = (data.events || []).find((e: any) => e.eventAction === 'expiration');
-    const createdDate = createdEvent ? createdEvent.eventDate : '';
-    const expiryDate = expiryEvent ? expiryEvent.eventDate : '';
-    let daysRemaining = 0;
-    if (expiryDate) {
-      const expiry = new Date(expiryDate);
-      daysRemaining = Math.ceil((expiry.getTime() - new Date().getTime()) / (1000 * 60 * 60 * 24));
-    }
-    const registrarEntity = (data.entities || []).find((e: any) => e.roles?.includes('registrar'));
-    const registrar = registrarEntity?.vcardArray?.[1]?.find((v: any) => v[0] === 'fn')?.[3] || 'Unknown';
-    return { domain, registrar, createdDate, expiryDate, daysRemaining, status: data.status || [], raw: data };
-  } catch (error) { return null; }
-};
-
-interface SpamhausQueryResult {
-  dataset: string; // Internal Zone Name (ZEN/DBL)
-  lists: string[]; // Actual List Names (XBL, SBL, etc)
-  listed: boolean;
-  reason: string;
-  codes: string[];
-}
 
 const getSpamhausListNames = (code: string, zone: string): string[] => {
   const last = code.split('.').pop() || '';
@@ -204,118 +134,31 @@ const getSpamhausListNames = (code: string, zone: string): string[] => {
 };
 
 const getSpamhausReason = (code: string, dataset: string): string => {
-  const parts = code.split('.');
-  const last = parts[parts.length - 1];
+  const last = code.split('.').pop() || '';
   if (dataset === 'ZEN') {
     switch (last) {
-      case '1': return 'Error: Unauthorized DQS Key';
       case '2': return 'SBL - Spamhaus Block List';
-      case '3': return 'SBL-CSS - Spamhaus CSS (Spam Source)';
+      case '3': return 'SBL-CSS - Spamhaus CSS';
       case '4': 
       case '5': 
       case '6': 
-      case '7': return 'XBL - Exploits Block List (Malware/Botnet)';
-      case '9': return 'SBL-DROP - Spamhaus DROP (Hijacked Space)';
-      case '10': return 'PBL - Policy Block List (ISP Dynamics)';
-      case '11': return 'PBL - Policy Block List (Non-MTA Space)';
-      case '20': return 'AuthBL - Compromised Credentials';
-      default: return 'Listed (ZEN)';
+      case '7': return 'XBL - Exploits Block List';
+      case '9': return 'SBL-DROP - Hijacked Space';
+      case '10': return 'PBL - ISP Dynamics';
+      case '11': return 'PBL - Non-MTA Space';
+      default: return 'Listed';
     }
-  } else if (dataset === 'DBL') {
-    const codeNum = parseInt(last);
-    if (codeNum === 255) return 'Error: Invalid DQS Key / Unauthorized';
-    if (codeNum === 2) return 'Bad Domain - Spam Source';
-    if (codeNum === 4) return 'Bad Domain - Phishing';
-    if (codeNum === 5) return 'Bad Domain - Malware';
-    if (codeNum === 6) return 'Bad Domain - Botnet C2';
-    if (codeNum >= 102 && codeNum <= 106) return 'Abused Legitimate Domain';
-    return 'Listed (DBL)';
   }
-  return 'Listed';
-};
-
-export const lookupSpamhausReputation = async (target: string, type: 'ip' | 'domain'): Promise<SpamhausQueryResult[]> => {
-  const results: SpamhausQueryResult[] = [];
-  const zones = type === 'ip' ? [{ name: 'ZEN', host: 'zen.dq.spamhaus.net' }] : [{ name: 'DBL', host: 'dbl.dq.spamhaus.net' }];
-  for (const zone of zones) {
-    let query = type === 'ip' ? (target.includes(':') ? `${reverseIpv6(target)}.${DQS_INTERNAL_KEY}.${zone.host}` : `${target.split('.').reverse().join('.')}.${DQS_INTERNAL_KEY}.${zone.host}`) : `${target}.${DQS_INTERNAL_KEY}.${zone.host}`;
-    const url = `https://dns.google/resolve?name=${query}&type=A`;
-    try {
-      const res = await fetch(url);
-      const data: DnsResponse = await res.json();
-      if (data.Status === 0 && data.Answer) {
-        const codes = data.Answer.map(ans => ans.data);
-        const hasDqsError = codes.some(c => (zone.name === 'ZEN' && c === '127.0.0.1') || (zone.name === 'DBL' && c === '127.0.1.255'));
-        results.push({
-          dataset: zone.name,
-          lists: codes.flatMap(c => getSpamhausListNames(c, zone.name)),
-          listed: !hasDqsError,
-          reason: hasDqsError ? 'Unauthorized / Invalid DQS Key' : codes.map(c => getSpamhausReason(c, zone.name)).join(', '),
-          codes
-        });
-      } else {
-        results.push({ dataset: zone.name, lists: [], listed: false, reason: 'Not listed', codes: [] });
-      }
-    } catch (e) { throw new Error('DQS infrastructure timeout'); }
-  }
-  return results;
+  return 'Listed (DBL)';
 };
 
 /**
- * Format date precisely as: Tue, 06 Jan 2026 6:25 PM IST
- */
-const formatDate = (unix: number): string => {
-  const d = new Date(unix * 1000);
-  const options: Intl.DateTimeFormatOptions = {
-    weekday: 'short',
-    day: '2-digit',
-    month: 'short',
-    year: 'numeric',
-    hour: 'numeric',
-    minute: '2-digit',
-    hour12: true,
-    timeZone: 'Asia/Kolkata'
-  };
-  // format returns string like "Tue, 06 Jan 2026, 6:25 PM" depending on locale
-  // We force a specific look
-  const parts = new Intl.DateTimeFormat('en-IN', options).formatToParts(d);
-  const find = (type: string) => parts.find(p => p.type === type)?.value || '';
-  
-  const weekday = find('weekday');
-  const day = find('day').padStart(2, '0');
-  const month = find('month');
-  const year = find('year');
-  const hour = find('hour');
-  const minute = find('minute');
-  const dayPeriod = find('dayPeriod').toUpperCase();
-  
-  return `${weekday}, ${day} ${month} ${year} ${hour}:${minute} ${dayPeriod} IST`;
-};
-
-/**
- * Token Management with Caching
- */
-const getSpamhausToken = async (): Promise<string | null> => {
-  const now = Date.now();
-  if (cachedToken && now < tokenExpiry) return cachedToken;
-  try {
-    const res = await fetch(`${PHP_API_URL}/spamhaus-auth.php?action=get_token`);
-    const data = await res.json();
-    if (data && data.token && !data.error) {
-      cachedToken = data.token;
-      tokenExpiry = now + (1000 * 60 * 30); // 30min cache
-      return cachedToken;
-    }
-    return null;
-  } catch (e) { return null; }
-};
-
-/**
- * IP History: Only fetches for XBL and CSS. Prioritizes XBL.
+ * IP History: Strictly XBL/CSS only. XBL Priority.
  */
 export const getIPReleaseDate = async (ip: string): Promise<{ text: string, data: any }> => {
   const token = await getSpamhausToken();
   if (!token) return { text: '<span class="text-rose-500 opacity-60">Auth failed</span>', data: null };
+
   try {
     const res = await fetch(`${PHP_API_URL}/spamhaus-history.php`, {
       method: 'POST',
@@ -323,16 +166,18 @@ export const getIPReleaseDate = async (ip: string): Promise<{ text: string, data
       body: JSON.stringify({ ip, token })
     });
     const data = await res.json();
+    
     if (Array.isArray(data) && data.length > 0) {
-      const allowed = data.filter(e => {
+      // REQUIREMENT: Only xbl, css. If both, show xbl.
+      const validEntries = data.filter(e => {
         const ds = (e.dataset || '').toUpperCase();
         return ds.includes('XBL') || ds.includes('CSS');
       });
 
-      if (allowed.length === 0) return { text: '—', data: null };
+      if (validEntries.length === 0) return { text: '—', data: null };
 
-      // Requirement: if xbl and sbl/css exist, show only xbl
-      const prioritized = allowed.sort((a, b) => {
+      // Sort to prioritize XBL (XBL usually has 'XBL' in name)
+      const prioritized = validEntries.sort((a, b) => {
         if (a.dataset.toUpperCase().includes('XBL')) return -1;
         if (b.dataset.toUpperCase().includes('XBL')) return 1;
         return 0;
@@ -343,7 +188,9 @@ export const getIPReleaseDate = async (ip: string): Promise<{ text: string, data
       return { text: html, data: prioritized };
     }
     return { text: '—', data: null };
-  } catch (e) { return { text: '<span class="text-rose-500 opacity-40">Fetch error</span>', data: null }; }
+  } catch (e) {
+    return { text: '<span class="text-rose-500 opacity-40">Fetch Error</span>', data: null };
+  }
 };
 
 /**
@@ -352,6 +199,7 @@ export const getIPReleaseDate = async (ip: string): Promise<{ text: string, data
 export const getDomainReleaseDate = async (domain: string): Promise<{ text: string, data: any }> => {
   const token = await getSpamhausToken();
   if (!token) return { text: '<span class="text-rose-500 opacity-60">Auth failed</span>', data: null };
+
   try {
     const res = await fetch(`${PHP_API_URL}/spamhaus-domain-history.php`, {
       method: 'POST',
@@ -360,19 +208,165 @@ export const getDomainReleaseDate = async (domain: string): Promise<{ text: stri
     });
     const data = await res.json();
     
-    if (data && data['listed-until']) {
-      const html = `<div><strong>DBL</strong> : ${formatDate(data['listed-until'])}</div>`;
-      return { text: html, data };
-    }
+    // Domain history might be object with listed-until or array
+    const timestamp = data['listed-until'] || (Array.isArray(data) && data[0] ? (data[0].valid_until || data[0]['listed-until']) : null);
     
-    if (Array.isArray(data) && data.length > 0) {
-      const entry = data[0];
-      const ts = entry.valid_until || entry['listed-until'];
-      if (!ts) return { text: '—', data: null };
-      const html = `<div><strong>${(entry.dataset || 'DBL').toUpperCase()}</strong> : ${formatDate(ts)}</div>`;
+    if (timestamp) {
+      const html = `<div><strong>DBL</strong> : ${formatDate(timestamp)}</div>`;
       return { text: html, data };
     }
     
     return { text: '—', data: null };
-  } catch (e) { return { text: '<span class="text-rose-500 opacity-40">Fetch error</span>', data: null }; }
+  } catch (e) {
+    return { text: '<span class="text-rose-500 opacity-40">Fetch Error</span>', data: null };
+  }
+};
+
+/**
+ * Existing Helper Functions
+ */
+const reverseIpv6 = (ip: string): string => {
+  const parts = ip.split(':');
+  let expanded = '';
+  for (const part of parts) {
+    if (part === '') {
+      const missing = 8 - parts.filter(p => p !== '').length;
+      expanded += '0000'.repeat(missing);
+    } else expanded += part.padStart(4, '0');
+  }
+  return expanded.split('').reverse().join('.');
+};
+
+/**
+ * Generic DNS Resolver
+ */
+export const lookupRecordByType = async (domain: string, type: string): Promise<DnsLookupEntry[]> => {
+  const typeNum = RECORD_TYPE_MAP[type.toUpperCase()] || 1;
+  const url = `https://dns.google/resolve?name=${domain}&type=${typeNum}`;
+  try {
+    const res = await fetch(url);
+    const data: DnsResponse = await res.json();
+    if (data.Status === 0 && data.Answer) {
+      return data.Answer.map(ans => ({
+        type: type.toUpperCase(),
+        name: ans.name,
+        value: ans.data,
+        ttl: ans.TTL
+      }));
+    }
+    return [];
+  } catch (e) {
+    return [];
+  }
+};
+
+/**
+ * Fetches DKIM record from DNS
+ */
+export const lookupDkimRecord = async (domain: string, selector: string): Promise<string | null> => {
+  const hostname = `${selector}._domainkey.${domain}`;
+  const records = await lookupRecordByType(hostname, 'TXT');
+  return records.length > 0 ? records[0].value.replace(/"/g, '') : null;
+};
+
+/**
+ * Fetches DMARC record from DNS
+ */
+export const lookupDmarcRecord = async (domain: string): Promise<string | null> => {
+  const hostname = `_dmarc.${domain}`;
+  const records = await lookupRecordByType(hostname, 'TXT');
+  return records.length > 0 ? records[0].value.replace(/"/g, '') : null;
+};
+
+/**
+ * Fetches SPF record from DNS
+ */
+export const lookupSpfRecord = async (domain: string): Promise<string | null> => {
+  const records = await lookupRecordByType(domain, 'TXT');
+  const spf = records.find(r => r.value.toLowerCase().includes('v=spf1'));
+  return spf ? spf.value.replace(/"/g, '') : null;
+};
+
+/**
+ * Fetches CAA records from DNS
+ */
+export const lookupCaaRecords = async (domain: string): Promise<CaaRecord[]> => {
+  const records = await lookupRecordByType(domain, 'CAA');
+  return records.map(r => {
+    const parts = r.value.split(' ');
+    if (parts.length >= 3) {
+      return {
+        flag: parseInt(parts[0]),
+        tag: parts[1],
+        value: parts.slice(2).join(' ').replace(/"/g, ''),
+        description: `Authorized CA: ${parts.slice(2).join(' ').replace(/"/g, '')}`
+      };
+    }
+    return {
+      flag: 0,
+      tag: 'issue',
+      value: r.value.replace(/"/g, ''),
+      description: 'Authorized CA entry'
+    };
+  });
+};
+
+/**
+ * Fetches MX records and maps them to providers
+ */
+export const lookupMxRecords = async (domain: string): Promise<MxRecord[]> => {
+  const records = await lookupRecordByType(domain, 'MX');
+  return records.map(r => {
+    const parts = r.value.split(' ');
+    const exchange = parts[1].replace(/\.$/, '');
+    let provider = 'Custom / Private';
+    if (exchange.includes('google.com')) provider = 'Google Workspace';
+    else if (exchange.includes('outlook.com')) provider = 'Microsoft 365';
+    else if (exchange.includes('protection.outlook.com')) provider = 'Microsoft 365';
+    else if (exchange.includes('zoho.com')) provider = 'Zoho Mail';
+    else if (exchange.includes('mimecast.com')) provider = 'Mimecast';
+    else if (exchange.includes('proofpoint.com')) provider = 'Proofpoint';
+    
+    return {
+      priority: parseInt(parts[0]),
+      exchange,
+      provider
+    };
+  }).sort((a, b) => a.priority - b.priority);
+};
+
+/**
+ * Resolves an IP address to a hostname (Reverse DNS)
+ */
+export const lookupPtrRecord = async (ip: string): Promise<string | null> => {
+  let query = '';
+  if (ip.includes(':')) {
+    query = `${reverseIpv6(ip)}.ip6.arpa`;
+  } else {
+    query = `${ip.split('.').reverse().join('.')}.in-addr.arpa`;
+  }
+  const records = await lookupRecordByType(query, 'PTR');
+  return records.length > 0 ? records[0].value.replace(/\.$/, '') : null;
+};
+
+/**
+ * Fetches WHOIS/Expiry data from backend API
+ */
+export const lookupWhoisData = async (domain: string): Promise<Partial<WhoisResult> | null> => {
+  try {
+    const res = await fetch(`${PHP_API_URL}/whois.php?domain=${domain}`);
+    const data = await res.json();
+    if (data && !data.error) {
+       return {
+         registrar: data.registrar,
+         createdDate: data.created_date,
+         expiryDate: data.expiry_date,
+         daysRemaining: data.days_remaining,
+         status: data.status || []
+       };
+    }
+    return null;
+  } catch (e) {
+    return null;
+  }
 };
