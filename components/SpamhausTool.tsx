@@ -45,13 +45,9 @@ const SpamhausTool: React.FC<SpamhausToolProps> = ({ onBack, theme }) => {
   }, [inputLines]);
 
   const handleProcess = async () => {
-    const dqsKey = process.env.SPAMHAUS_DQS_KEY;
+    // Attempt to retrieve the key from environment
+    const dqsKey = process.env.SPAMHAUS_DQS_KEY || '';
     
-    if (!dqsKey) {
-      notify('error', 'Spamhaus API Key is missing in environment variables. Please configure SPAMHAUS_DQS_KEY in Cloudflare.');
-      return;
-    }
-
     if (uniqueInputs.length === 0) {
       notify('warning', 'Please provide target IPs or domains.');
       return;
@@ -78,6 +74,8 @@ const SpamhausTool: React.FC<SpamhausToolProps> = ({ onBack, theme }) => {
       setResults(prev => prev.map(r => r.input === target ? { ...r, status: 'loading' } : r));
 
       try {
+        // If dqsKey is empty here, the service will likely throw a 'Query Limit' or 
+        // 'Unauthorized' error which is handled in the catch block.
         const reputation = await lookupSpamhausReputation(target, type, dqsKey);
         
         const isListed = reputation.some(rep => rep.listed);
