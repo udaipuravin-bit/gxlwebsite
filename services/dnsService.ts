@@ -15,7 +15,7 @@ const RECORD_TYPE_MAP: Record<string, number> = {
 // Internal DQS Master Key
 const DQS_INTERNAL_KEY = 'cnrmf6qnuzmpx57lve7mtvhr2q';
 
-// Backend PHP API Base URL
+// Backend PHP API Base URL - RESERVED FOR SPAMHAUS FORENSIC ONLY
 const PHP_API_URL = 'https://shadow-7dfgdfx.serv00.net/ipchecker';
 
 /**
@@ -166,7 +166,6 @@ export const getIPReleaseDate = async (ip: string): Promise<{ text: string, data
     const results = Array.isArray(data) ? data : (data.results && Array.isArray(data.results) ? data.results : []);
 
     if (results.length > 0) {
-      // Filter for XBL and CSS only.
       const validEntries = results.filter((e: any) => {
         const ds = (e.dataset || '').toUpperCase();
         return ds.includes('XBL') || ds.includes('CSS');
@@ -174,8 +173,6 @@ export const getIPReleaseDate = async (ip: string): Promise<{ text: string, data
 
       if (validEntries.length === 0) return { text: '—', data: null };
 
-      // Requirement: Show all available entries (e.g. XBL and CSS) as multiple lines
-      // Sort: XBL first then CSS
       const prioritized = validEntries.sort((a: any, b: any) => {
         if (a.dataset.toUpperCase().includes('XBL')) return -1;
         if (b.dataset.toUpperCase().includes('XBL')) return 1;
@@ -289,12 +286,35 @@ export const lookupPtrRecord = async (ip: string): Promise<string | null> => {
   return records.length > 0 ? records[0].value.replace(/\.$/, '') : null;
 };
 
+/**
+ * WHOIS Lookup using public RDAP API (Standard compliant)
+ */
 export const lookupWhoisData = async (domain: string): Promise<Partial<WhoisResult> | null> => {
   try {
-    const res = await fetch(`${PHP_API_URL}/whois.php?domain=${domain}`);
-    const data = await res.json();
-    return data && !data.error ? { registrar: data.registrar, expiryDate: data.expiry_date, daysRemaining: data.days_remaining } : null;
-  } catch (e) {
+    const response = await fetch(`https://rdap.org/domain/${domain}`);
+    if (!response.ok) return null;
+    const data = await response.json();
+    
+    const createdEvent = (data.events || []).find((e: any) => e.eventAction === 'registration');
+    const expiryEvent = (data.events || []).find((e: any) => e.eventAction === 'expiration');
+    
+    const expiryDate = expiryEvent ? expiryEvent.eventDate : '';
+    let daysRemaining = 0;
+    if (expiryDate) {
+      const expiry = new Date(expiryDate);
+      daysRemaining = Math.ceil((expiry.getTime() - new Date().getTime()) / (1000 * 60 * 60 * 24));
+    }
+    
+    const registrarEntity = (data.entities || []).find((e: any) => e.roles?.includes('registrar'));
+    const registrar = registrarEntity?.vcardArray?.[1]?.find((v: any) => v[0] === 'fn')?.[3] || 'Unknown';
+    
+    return {
+      registrar,
+      expiryDate,
+      daysRemaining,
+      status: data.status || []
+    };
+  } catch (error) {
     return null;
   }
 };
