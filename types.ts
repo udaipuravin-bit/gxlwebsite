@@ -1,3 +1,4 @@
+
 export interface DkimResult {
   id: number;
   domain: string;
@@ -203,11 +204,10 @@ export interface SpamhausResult {
   listed: boolean;
   datasets: string[];
   reason: string;
-  codes: string[];
+  releaseDate?: string;
   status: 'clean' | 'listed-high' | 'listed-low' | 'pending' | 'loading' | 'error';
 }
 
-// Fixed missing EmailMasterAction and RecordMatchResult types
 export type EmailMasterAction = 'optimize' | 'fix' | 'decode' | 'validate' | 'write';
 
 export interface RecordMatchResult {

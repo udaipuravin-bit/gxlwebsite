@@ -15,10 +15,11 @@ import {
   ShieldAlert,
   Shield,
   AlertTriangle,
-  FileCheck
+  FileCheck,
+  History
 } from 'lucide-react';
 import { SpamhausResult } from '../types';
-import { lookupSpamhausReputation } from '../services/dnsService';
+import { lookupSpamhausReputation, getIPReleaseDate, getDomainReleaseDate } from '../services/dnsService';
 import { useNotify } from '../App';
 
 interface SpamhausToolProps {
@@ -41,7 +42,7 @@ const SpamhausTool: React.FC<SpamhausToolProps> = ({ onBack, theme }) => {
   }, [input]);
 
   const uniqueInputs = useMemo(() => {
-    return Array.from(new Set(inputLines)).slice(0, 1000); // Strict 1000 entry limit
+    return Array.from(new Set(inputLines)).slice(0, 1000); 
   }, [inputLines]);
 
   const handleProcess = async () => {
@@ -57,13 +58,12 @@ const SpamhausTool: React.FC<SpamhausToolProps> = ({ onBack, theme }) => {
       listed: false,
       datasets: [],
       reason: '',
-      codes: [],
       status: 'pending'
     })));
 
     setIsProcessing(true);
     setShowInstructions(false);
-    notify('info', `Spamhaus Blacklist Audit: Processing ${uniqueInputs.length} targets.`);
+    notify('info', `Audit matrix initialized for ${uniqueInputs.length} targets.`);
 
     for (let i = 0; i < uniqueInputs.length; i++) {
       const target = uniqueInputs[i];
@@ -75,49 +75,66 @@ const SpamhausTool: React.FC<SpamhausToolProps> = ({ onBack, theme }) => {
         const reputation = await lookupSpamhausReputation(target, type);
         
         const isListed = reputation.some(rep => rep.listed);
-        const listedDatasets = reputation.filter(rep => rep.listed).map(rep => rep.dataset);
+        // Extract the granular sub-datasets (XBL, CSS, SBL, etc)
+        const allLists = Array.from(new Set(reputation.flatMap(rep => rep.lists)));
         const reasons = reputation.filter(rep => rep.listed || rep.reason.includes('Unauthorized')).map(rep => rep.reason);
-        const allCodes = reputation.flatMap(rep => rep.codes);
 
         let status: SpamhausResult['status'] = 'clean';
         if (isListed) {
-          const isHighRisk = reputation.some(rep => 
-            rep.codes.some(c => {
+          const codes = reputation.flatMap(rep => rep.codes);
+          const isHighRisk = codes.some(c => {
                const last = c.split('.').pop() || '';
-               // ZEN codes 2-9 are high risk (SBL, XBL, DROP). DBL codes 2-9 are high risk.
                return ['2','3','4','5','6','7','9'].includes(last);
-            })
-          );
+          });
           status = isHighRisk ? 'listed-high' : 'listed-low';
         }
 
-        setResults(prev => prev.map(r => r.input === target ? {
-          ...r,
+        // Only XBL, CSS, DBL fetch the release date. SBL/PBL-only is ignored.
+        const historyAllowed = allLists.some(list => {
+          const u = list.toUpperCase();
+          return u.includes('XBL') || u.includes('CSS') || u.includes('DBL');
+        });
+
+        const baseResult: Partial<SpamhausResult> = {
           listed: isListed,
-          datasets: isListed ? listedDatasets : (reasons.some(r => r.includes('Unauthorized')) ? ['Error'] : ['None']),
+          datasets: isListed ? allLists : (reasons.some(r => r.includes('Unauthorized')) ? ['Error'] : ['None']),
           reason: reasons.length > 0 ? (isListed ? reasons.join('; ') : reasons[0]) : 'NOT LISTED',
-          codes: allCodes,
-          status: reasons.some(r => r.includes('Unauthorized')) ? 'error' : status
-        } : r));
+          status: reasons.some(r => r.includes('Unauthorized')) ? 'error' : status,
+          releaseDate: (isListed && historyAllowed) ? 'pending_history' : '—'
+        };
+
+        setResults(prev => prev.map(r => r.input === target ? { ...r, ...baseResult } as SpamhausResult : r));
+
+        // Background fetch for release dates ONLY if allowed
+        if (isListed && historyAllowed) {
+          (async () => {
+            try {
+              const history = type === 'ip' ? await getIPReleaseDate(target) : await getDomainReleaseDate(target);
+              setResults(prev => prev.map(r => r.input === target ? { ...r, releaseDate: history.text } : r));
+            } catch (err) {
+              setResults(prev => prev.map(r => r.input === target ? { ...r, releaseDate: '<span class="text-rose-500 opacity-40">Fetch Error</span>' } : r));
+            }
+          })();
+        }
+
       } catch (err: any) {
         setResults(prev => prev.map(r => r.input === target ? { 
           ...r, 
           status: 'error', 
-          listed: false,
+          listed: false, 
           reason: err.message || 'DQS Resolve failure' 
         } : r));
       }
     }
 
     setIsProcessing(false);
-    notify('success', 'Bulk check completed.');
+    notify('success', 'Core reputation audit complete.');
   };
 
   const filteredResults = useMemo(() => {
     return results.filter(r => 
       r.input.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      r.reason.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      r.datasets.some(d => d.toLowerCase().includes(searchQuery.toLowerCase()))
+      r.reason.toLowerCase().includes(searchQuery.toLowerCase())
     );
   }, [results, searchQuery]);
 
@@ -138,8 +155,8 @@ const SpamhausTool: React.FC<SpamhausToolProps> = ({ onBack, theme }) => {
               <ShieldAlert size={28} />
             </div>
             <div>
-              <h1 className="text-xl md:text-2xl font-black tracking-tight uppercase">Spamhaus Blacklist Engine</h1>
-              <p className="text-slate-500 text-[10px] font-black uppercase tracking-widest opacity-60">Professional DQS Security Matrix</p>
+              <h1 className="text-xl md:text-2xl font-black tracking-tight uppercase">Spamhaus Intelligence Hub</h1>
+              <p className="text-slate-500 text-[10px] font-black uppercase tracking-widest opacity-60">XBL / CSS / DBL Release Timeline</p>
             </div>
           </div>
         </div>
@@ -148,43 +165,40 @@ const SpamhausTool: React.FC<SpamhausToolProps> = ({ onBack, theme }) => {
             onClick={() => setShowInstructions(!showInstructions)}
             className={`flex items-center gap-2 px-4 py-2 rounded-2xl transition-all font-bold text-xs border uppercase tracking-widest ${isDark ? 'bg-slate-800 border-slate-700 text-slate-400 hover:text-white' : 'bg-slate-100 border-slate-200 text-slate-600 hover:bg-slate-50'}`}
           >
-            <Info size={16} /> <span className="hidden sm:inline">User Guide</span>
+            <Info size={16} /> <span className="hidden sm:inline">Operational Guide</span>
           </button>
         </div>
       </header>
 
-      {/* Operational Protocol */}
+      {/* Manual */}
       {showInstructions && (
         <section className={`p-8 rounded-3xl border animate-in slide-in-from-top-4 duration-300 ${cardClasses}`}>
           <div className="flex justify-between items-start mb-6">
              <h2 className="text-lg font-black uppercase tracking-tight flex items-center gap-2">
-               <ShieldCheck className="text-rose-500" /> Professional Documentation
+               <ShieldCheck className="text-rose-500" /> Professional Protocol
              </h2>
              <button onClick={() => setShowInstructions(false)} className="text-slate-500 hover:text-white">
                 <X size={20} />
              </button>
           </div>
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-8 text-sm">
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-8 text-sm">
              <div className="space-y-4">
                 <p className="font-black text-slate-400 uppercase text-[10px] tracking-widest flex items-center gap-2">
-                  <ChevronRight size={12} className="text-rose-500"/> Methodology
+                  <ChevronRight size={12} className="text-rose-500"/> Phase 1: DNSBL
                 </p>
-                <ol className="list-decimal list-inside space-y-2 text-slate-400 font-medium">
-                  <li>Input bulk IPv4, IPv6, or Domain identifiers.</li>
-                  <li>System detects and reverses IP octets for DQS format.</li>
-                  <li>Direct A-record query against Spamhaus Professional Zones.</li>
-                  <li>Interpret return codes based on RFC/Spamhaus standards.</li>
-                </ol>
+                <p className="text-slate-500 leading-relaxed font-medium">Verify current listing status across Spamhaus datasets (ZEN, DBL) using low-latency DNS resolution.</p>
              </div>
              <div className="space-y-4">
                 <p className="font-black text-slate-400 uppercase text-[10px] tracking-widest flex items-center gap-2">
-                  <ChevronRight size={12} className="text-rose-500"/> Return Code Glossary
+                  <ChevronRight size={12} className="text-rose-500"/> Phase 2: Timeline
                 </p>
-                <ul className="space-y-2 text-slate-400 font-medium">
-                  <li><strong className="text-rose-400">127.0.0.x</strong>: ZEN (IP Reputation). .2:SBL, .4:XBL, .10:PBL.</li>
-                  <li><strong className="text-rose-400">127.0.1.x</strong>: DBL (Domain Reputation). .2:Spam, .4:Phish, .5:Malware.</li>
-                  <li><strong className="text-amber-400">Low Reputation</strong>: New domains or abused legitimate infrastructure.</li>
-                </ul>
+                <p className="text-slate-500 leading-relaxed font-medium">For XBL, CSS, and DBL listings, the system queries the forensic timeline to determine the "Valid Until" timestamp.</p>
+             </div>
+             <div className="space-y-4">
+                <p className="font-black text-slate-400 uppercase text-[10px] tracking-widest flex items-center gap-2">
+                  <ChevronRight size={12} className="text-rose-500"/> IST Localization
+                </p>
+                <p className="text-slate-500 leading-relaxed font-medium">All timestamps are normalized and converted to Indian Standard Time (IST) for consistent forensic reporting.</p>
              </div>
           </div>
         </section>
@@ -195,9 +209,9 @@ const SpamhausTool: React.FC<SpamhausToolProps> = ({ onBack, theme }) => {
         <div className={`p-6 rounded-3xl shadow-xl border flex flex-col gap-4 ${cardClasses}`}>
           <div className="flex items-center justify-between">
             <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest flex items-center gap-2">
-               <Terminal size={12} className="text-rose-500" /> Forensic Target List (IPs/Domains)
+               <Terminal size={12} className="text-rose-500" /> Target Forensic Identifiers (IPs/Domains)
             </label>
-            <span className="text-[10px] font-black text-slate-600 italic">DQS throughput: Up to 1,000 entries</span>
+            <span className="text-[10px] font-black text-slate-600 italic">Audit Capacity: 1,000 entries per session</span>
           </div>
           <textarea
             value={input}
@@ -208,7 +222,7 @@ const SpamhausTool: React.FC<SpamhausToolProps> = ({ onBack, theme }) => {
           <div className="flex flex-col sm:flex-row items-center justify-between gap-4 mt-2">
             <div className={`px-5 py-2.5 rounded-2xl border flex items-center gap-3 ${isDark ? 'bg-slate-950 border-slate-800' : 'bg-white border-slate-100'}`}>
                <div className="flex flex-col">
-                  <span className="text-[8px] font-black text-slate-500 uppercase tracking-widest">Identifiers Detected</span>
+                  <span className="text-[8px] font-black text-slate-500 uppercase tracking-widest">Targets Detected</span>
                   <span className="text-lg font-black text-rose-500 leading-none">{uniqueInputs.length}</span>
                </div>
             </div>
@@ -217,7 +231,7 @@ const SpamhausTool: React.FC<SpamhausToolProps> = ({ onBack, theme }) => {
               disabled={isProcessing || uniqueInputs.length === 0}
               className="w-full sm:w-auto px-12 py-4 bg-rose-600 hover:bg-rose-500 text-white rounded-2xl font-black uppercase tracking-widest text-[10px] shadow-2xl shadow-rose-600/20 disabled:opacity-50 flex items-center justify-center gap-3 transition-all"
             >
-              {isProcessing ? <><Loader2 size={16} className="animate-spin" /> Querying Spamhaus Nodes...</> : <><Zap size={16} /> Run Forensic Blacklist Audit</>}
+              {isProcessing ? <><Loader2 size={16} className="animate-spin" /> Querying Nodes...</> : <><Zap size={16} /> Run Full Audit</>}
             </button>
           </div>
         </div>
@@ -231,7 +245,7 @@ const SpamhausTool: React.FC<SpamhausToolProps> = ({ onBack, theme }) => {
               <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-500" size={14} />
               <input
                 type="text"
-                placeholder="Search blacklist results..."
+                placeholder="Search matrix results..."
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
                 className={`w-full pl-10 pr-4 py-2.5 border rounded-xl outline-none text-xs font-bold transition-all ${inputClasses}`}
@@ -240,19 +254,19 @@ const SpamhausTool: React.FC<SpamhausToolProps> = ({ onBack, theme }) => {
             <div className="flex gap-2">
                <button 
                 onClick={() => {
-                  const csv = [['Sl No', 'Target Identifier', 'Listed', 'Dataset(s)', 'Reason', 'Return Codes'].join(','), ...results.map(r => [r.id, r.input, r.listed ? 'YES' : 'NO', r.datasets.join(';'), r.reason, r.codes.join(';')].join(','))].join('\n');
+                  const csv = [['Sl No', 'Identifier', 'Listed', 'Datasets', 'Reason', 'Release Date'].join(','), ...results.map(r => [r.id, r.input, r.listed ? 'YES' : 'NO', r.datasets.join(';'), r.reason, (r.releaseDate || '—').replace(/<[^>]*>/g, '')].join(','))].join('\n');
                   const blob = new Blob([csv], { type: 'text/csv' });
                   const url = window.URL.createObjectURL(blob);
                   const a = document.createElement('a');
                   a.setAttribute('href', url);
-                  a.setAttribute('download', `spamhaus_blacklist_${Date.now()}.csv`);
+                  a.setAttribute('download', `spamhaus_timeline_${Date.now()}.csv`);
                   document.body.appendChild(a);
                   a.click();
                   document.body.removeChild(a);
                 }}
                 className={`flex items-center gap-2 px-6 py-2.5 rounded-xl border font-black text-[10px] uppercase tracking-widest transition-all ${isDark ? 'bg-slate-800 border-slate-700 text-slate-300 hover:bg-slate-700' : 'bg-white border-slate-200 text-slate-600 hover:bg-slate-50'}`}
               >
-                <Download size={14} /> CSV Export
+                <Download size={14} /> CSV Report
               </button>
               <button onClick={() => { setResults([]); notify('info', 'Matrix reset.'); }} className="p-2.5 bg-rose-500/10 text-rose-400 hover:bg-rose-500/20 rounded-2xl text-sm font-bold transition-all border border-rose-500/20">
                 <Trash2 size={20} />
@@ -269,7 +283,7 @@ const SpamhausTool: React.FC<SpamhausToolProps> = ({ onBack, theme }) => {
                   <th className="px-6 py-4 text-center">Listed</th>
                   <th className="px-6 py-4">Dataset(s)</th>
                   <th className="px-6 py-4">Reason / Reputation</th>
-                  <th className="px-6 py-4 text-center">Return Code(s)</th>
+                  <th className="px-6 py-4 min-w-[280px]">Release Timeline (IST)</th>
                 </tr>
               </thead>
               <tbody className={`divide-y ${isDark ? 'divide-[#1e293b]' : 'divide-slate-100'}`}>
@@ -279,7 +293,7 @@ const SpamhausTool: React.FC<SpamhausToolProps> = ({ onBack, theme }) => {
                     <td className="px-6 py-4">
                       <div className="flex flex-col">
                          <span className={`text-sm font-black tracking-tight ${isDark ? 'text-slate-100' : 'text-slate-900'}`}>{r.input}</span>
-                         <span className="text-[8px] text-slate-500 font-black uppercase tracking-[0.2em] mt-0.5">{r.type} Audit</span>
+                         <span className="text-[8px] text-slate-500 font-black uppercase tracking-[0.2em] mt-0.5">{r.type} AUDIT</span>
                       </div>
                     </td>
                     <td className="px-6 py-4 text-center">
@@ -299,8 +313,8 @@ const SpamhausTool: React.FC<SpamhausToolProps> = ({ onBack, theme }) => {
                          {r.reason}
                        </p>
                     </td>
-                    <td className="px-6 py-4 text-center">
-                       <code className="text-[10px] font-mono text-slate-600">{r.codes.join(', ') || '—'}</code>
+                    <td className="px-6 py-4">
+                       <ReleaseDateCell releaseDate={r.releaseDate} listed={r.listed} />
                     </td>
                   </tr>
                 ))}
@@ -312,12 +326,29 @@ const SpamhausTool: React.FC<SpamhausToolProps> = ({ onBack, theme }) => {
 
       {/* Footer Branding */}
       <footer className={`mt-auto pt-10 border-t flex flex-col sm:flex-row justify-between items-center gap-6 text-[10px] font-black text-slate-600 uppercase tracking-widest ${isDark ? 'border-slate-800' : 'border-slate-200'}`}>
-        <p>© {new Date().getFullYear()} Authenticator Pro Lab • Spamhaus Intelligence v6.1.0</p>
+        <p>© {new Date().getFullYear()} Authenticator Pro Lab • Spamhaus Intelligence Hub v7.3.0</p>
         <div className="flex gap-6">
-          <a href="https://www.spamhaus.org/lookup/" target="_blank" className="hover:text-rose-400 flex items-center gap-1">Spamhaus.org <ExternalLink size={10}/></a>
+          <a href="https://www.spamhaus.org/lookup/" target="_blank" className="hover:text-rose-400 flex items-center gap-1">Manual Audit <ExternalLink size={10}/></a>
         </div>
       </footer>
     </div>
+  );
+};
+
+const ReleaseDateCell: React.FC<{ releaseDate?: string; listed: boolean }> = ({ releaseDate, listed }) => {
+  if (!listed) return <span className="text-[10px] text-slate-600">—</span>;
+  if (!releaseDate || releaseDate === 'pending_history') {
+    return (
+      <div className="flex items-center gap-2 text-[10px] text-slate-500 font-bold uppercase tracking-widest animate-pulse">
+        <Loader2 size={12} className="animate-spin" /> Fetching Timeline...
+      </div>
+    );
+  }
+  return (
+    <div 
+      className="text-[10px] font-mono leading-relaxed space-y-1"
+      dangerouslySetInnerHTML={{ __html: releaseDate }}
+    />
   );
 };
 
@@ -335,8 +366,8 @@ const StatusBadge: React.FC<{ status: SpamhausResult['status']; listed: boolean 
     'listed-high': 'YES (High)',
     'listed-low': 'YES (Low)',
     loading: 'QUERY',
-    error: 'INVALID KEY',
-    pending: 'WAIT'
+    error: 'KEY ERROR',
+    pending: 'QUEUE'
   };
   return (
     <span className={`px-2 py-0.5 rounded text-[8px] font-black uppercase tracking-widest border ${styles[status]}`}>
