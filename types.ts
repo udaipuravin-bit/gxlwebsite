@@ -218,3 +218,18 @@ export interface RecordMatchResult {
   found: string;
   status: 'pending' | 'loading' | 'match' | 'mismatch' | 'missing' | 'error';
 }
+
+export interface UrlTraceHop {
+  id: number;
+  url: string;
+  statusCode: number;
+  meaning: string;
+  statusClass: '1xx' | '2xx' | '3xx' | '4xx' | '5xx' | 'error';
+}
+
+export interface UrlTraceResult {
+  targetUrl: string;
+  hops: UrlTraceHop[];
+  isComplete: boolean;
+  error?: string;
+}

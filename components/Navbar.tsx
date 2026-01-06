@@ -1,4 +1,3 @@
-
 import React, { useState, useRef, useEffect } from 'react';
 import { 
   ChevronDown, 
@@ -23,7 +22,9 @@ import {
   Search as SearchIcon,
   FileCode2,
   AlertOctagon,
-  ShieldAlert
+  ShieldAlert,
+  Link2,
+  Scissors
 } from 'lucide-react';
 
 interface NavbarProps {
@@ -48,12 +49,14 @@ const Navbar: React.FC<NavbarProps> = ({ onNavigate, theme, onToggleTheme }) => 
       { id: 'caa-checker', name: 'CAA Policy', icon: <FileCheck size={16} />, color: 'text-teal-400' },
     ],
     infrastructure: [
+      { id: 'url-tracer', name: 'URL Tracer', icon: <Link2 size={16} />, color: 'text-indigo-400' },
       { id: 'mx-lookup', name: 'MX & Providers', icon: <Mail size={16} />, color: 'text-rose-400' },
       { id: 'dns-lookup', name: 'Deep DNS', icon: <SearchCode size={16} />, color: 'text-indigo-400' },
       { id: 'reverse-dns', name: 'Reverse DNS', icon: <Hash size={16} />, color: 'text-violet-400' },
     ],
     forensics: [
       { id: 'email-master', name: 'Email Master', icon: <FileCode2 size={16} />, color: 'text-indigo-400' },
+      { id: 'html-cleaner', name: 'HTML Cleaner', icon: <Scissors size={16} />, color: 'text-emerald-400' },
       { id: 'email-header-analyzer', name: 'Header Forensic', icon: <FileText size={16} />, color: 'text-orange-400' },
       { id: 'ip-geolocation', name: 'IP Geolocation', icon: <MapPin size={16} />, color: 'text-cyan-400' },
       { id: 'whois-checker', name: 'Domain Expiry', icon: <Calendar size={16} />, color: 'text-lime-400' },

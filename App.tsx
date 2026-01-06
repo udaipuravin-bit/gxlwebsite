@@ -1,4 +1,3 @@
-
 import React, { useState, createContext, useContext, useCallback } from 'react';
 import Navbar from './components/Navbar';
 import Home from './components/Home';
@@ -16,9 +15,11 @@ import MimeEncoderTool from './components/MimeEncoderTool';
 import SubjectEncoderTool from './components/SubjectEncoderTool';
 import EmailMasterTool from './components/EmailMasterTool';
 import SpamhausTool from './components/SpamhausTool';
+import UrlTracerTool from './components/UrlTracerTool';
+import HtmlCleanerTool from './components/HtmlCleanerTool';
 import { X, CheckCircle2, AlertCircle, Info, AlertTriangle } from 'lucide-react';
 
-type View = 'home' | 'dkim-checker' | 'dmarc-checker' | 'spf-validator' | 'dns-lookup' | 'mx-lookup' | 'whois-checker' | 'reverse-dns' | 'caa-checker' | 'email-header-analyzer' | 'ip-geolocation' | 'mime-encoder' | 'subject-encoder' | 'email-master' | 'spamhaus-checker';
+type View = 'home' | 'dkim-checker' | 'dmarc-checker' | 'spf-validator' | 'dns-lookup' | 'mx-lookup' | 'whois-checker' | 'reverse-dns' | 'caa-checker' | 'email-header-analyzer' | 'ip-geolocation' | 'mime-encoder' | 'subject-encoder' | 'email-master' | 'spamhaus-checker' | 'url-tracer' | 'html-cleaner';
 type Theme = 'dark' | 'light';
 
 export type NotificationType = 'success' | 'error' | 'info' | 'warning';
@@ -72,13 +73,15 @@ const App: React.FC = () => {
   return (
     <NotificationContext.Provider value={{ notify }}>
       <div className={`min-h-screen transition-colors duration-300 ${isDark ? 'bg-slate-950 text-slate-100' : 'bg-slate-50 text-slate-900'} selection:bg-indigo-500/30`}>
-        <Navbar 
-          onNavigate={(view) => navigate(view as View)} 
-          theme={theme} 
-          onToggleTheme={toggleTheme} 
-        />
+        {currentView !== 'html-cleaner' && currentView !== 'email-master' && (
+          <Navbar 
+            onNavigate={(view) => navigate(view as View)} 
+            theme={theme} 
+            onToggleTheme={toggleTheme} 
+          />
+        )}
         
-        <main className="relative z-0 pt-16">
+        <main className={`relative z-0 ${currentView === 'html-cleaner' || currentView === 'email-master' ? 'pt-0' : 'pt-16'}`}>
           {currentView === 'home' && (
             <Home 
               theme={theme}
@@ -96,6 +99,8 @@ const App: React.FC = () => {
               onLaunchSubjectEncoder={() => navigate('subject-encoder')}
               onLaunchEmailMaster={() => navigate('email-master')}
               onLaunchSpamhaus={() => navigate('spamhaus-checker')}
+              onLaunchUrlTracer={() => navigate('url-tracer')}
+              onLaunchHtmlCleaner={() => navigate('html-cleaner')}
             />
           )}
           {currentView === 'dkim-checker' && <DkimTool theme={theme} onBack={() => navigate('home')} />}
@@ -112,6 +117,8 @@ const App: React.FC = () => {
           {currentView === 'subject-encoder' && <SubjectEncoderTool theme={theme} onBack={() => navigate('home')} />}
           {currentView === 'email-master' && <EmailMasterTool theme={theme} onBack={() => navigate('home')} />}
           {currentView === 'spamhaus-checker' && <SpamhausTool theme={theme} onBack={() => navigate('home')} />}
+          {currentView === 'url-tracer' && <UrlTracerTool theme={theme} onBack={() => navigate('home')} />}
+          {currentView === 'html-cleaner' && <HtmlCleanerTool theme={theme} onBack={() => navigate('home')} />}
         </main>
 
         <div className="fixed top-6 right-6 z-[10000] flex flex-col gap-3 w-full max-w-sm pointer-events-none">

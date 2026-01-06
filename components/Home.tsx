@@ -1,4 +1,3 @@
-
 import React from 'react';
 import { 
   ShieldCheck, 
@@ -19,7 +18,9 @@ import {
   Type,
   FileCode2,
   AlertOctagon,
-  ShieldAlert
+  ShieldAlert,
+  Link2,
+  Scissors
 } from 'lucide-react';
 
 interface HomeProps {
@@ -38,25 +39,18 @@ interface HomeProps {
   onLaunchSubjectEncoder: () => void;
   onLaunchEmailMaster: () => void;
   onLaunchSpamhaus: () => void;
+  onLaunchUrlTracer: () => void;
+  onLaunchHtmlCleaner: () => void;
 }
 
 const Home: React.FC<HomeProps> = (props) => {
   const isDark = props.theme === 'dark';
 
   return (
-    <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12 md:py-20 animate-in fade-in duration-700">
-      {/* Hero Section */}
-      <header className="text-center mb-20 space-y-6 relative">
-        <div className={`absolute top-0 left-1/2 -translate-x-1/2 w-[500px] h-[500px] blur-[120px] rounded-full -z-10 transition-colors ${isDark ? 'bg-indigo-600/10' : 'bg-indigo-200/20'}`} />
-        <div className={`inline-flex items-center gap-2 px-3 py-1 rounded-full border text-[10px] font-black uppercase tracking-[0.2em] mb-4 ${isDark ? 'bg-indigo-500/10 border-indigo-500/20 text-indigo-400' : 'bg-indigo-50 border-indigo-100 text-indigo-600'}`}>
-          <Zap size={12} className="fill-current" /> Intelligence Control Plane
-        </div>
-        <h1 className={`text-5xl md:text-7xl font-black tracking-tight leading-tight ${isDark ? 'text-white' : 'text-slate-900'}`}>
-          Bulk Security <span className="text-transparent bg-clip-text bg-gradient-to-r from-indigo-500 to-teal-400">& Intelligence</span>
-        </h1>
-        <h2 className={`text-lg md:text-xl max-w-3xl mx-auto font-medium leading-relaxed ${isDark ? 'text-slate-400' : 'text-slate-600'}`}>
-          Professional toolsuite for bulk reputation auditing, protocol verification, and forensic domain analysis.
-        </h2>
+    <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12 md:py-12 animate-in fade-in duration-700">
+      {/* Hero Section - Background Glow Only */}
+      <header className="text-center mb-12 relative">
+        <div className={`absolute top-0 left-1/2 -translate-x-1/2 w-[500px] h-[300px] blur-[120px] rounded-full -z-10 transition-colors ${isDark ? 'bg-indigo-600/10' : 'bg-indigo-200/20'}`} />
       </header>
 
       {/* Category 1: Reputation & Authentication */}
@@ -124,7 +118,16 @@ const Home: React.FC<HomeProps> = (props) => {
           </div>
           <h2 className={`text-2xl font-black tracking-tight uppercase ${isDark ? 'text-white' : 'text-slate-800'}`}>Infrastructure</h2>
         </div>
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+          <ToolCard 
+            theme={props.theme}
+            onClick={props.onLaunchUrlTracer} 
+            icon={<Link2 size={32} />} 
+            title="URL Redirect Tracer" 
+            desc="Audit resolution paths and HTTP status codes." 
+            colorClass="text-indigo-400"
+            glowClass="bg-indigo-500/10"
+          />
           <ToolCard 
             theme={props.theme}
             onClick={props.onLaunchMx} 
@@ -163,7 +166,7 @@ const Home: React.FC<HomeProps> = (props) => {
           </div>
           <h2 className={`text-2xl font-black tracking-tight uppercase ${isDark ? 'text-white' : 'text-slate-800'}`}>Forensic Tools</h2>
         </div>
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-6 gap-4">
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-7 gap-4">
           <ToolCard 
             theme={props.theme}
             onClick={props.onLaunchEmailMaster} 
@@ -172,6 +175,15 @@ const Home: React.FC<HomeProps> = (props) => {
             desc="Professional HTML/MIME editor." 
             colorClass="text-indigo-400"
             glowClass="bg-indigo-500/10"
+          />
+          <ToolCard 
+            theme={props.theme}
+            onClick={props.onLaunchHtmlCleaner} 
+            icon={<Scissors size={28} />} 
+            title="HTML Cleaner" 
+            desc="Sanitize and audit HTML tracking." 
+            colorClass="text-emerald-400"
+            glowClass="bg-emerald-500/10"
           />
           <ToolCard 
             theme={props.theme}

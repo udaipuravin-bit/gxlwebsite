@@ -1,4 +1,3 @@
-
 import React, { useState, useMemo } from 'react';
 import { 
   Search, 
@@ -14,10 +13,12 @@ import {
   Globe,
   Download,
   CheckCircle2,
-  AlertCircle
+  AlertCircle,
+  Zap
 } from 'lucide-react';
 import { WhoisResult } from '../types';
 import { lookupWhoisData } from '../services/dnsService';
+import { useNotify } from '../App';
 
 interface WhoisToolProps {
   onBack: () => void;
@@ -27,6 +28,7 @@ interface WhoisToolProps {
 type FilterStatus = 'all' | 'expiring' | 'safe' | 'error';
 
 const WhoisTool: React.FC<WhoisToolProps> = ({ onBack, theme }) => {
+  const { notify } = useNotify();
   const isDark = theme === 'dark';
   const [domainsInput, setDomainsInput] = useState('');
   const [results, setResults] = useState<WhoisResult[]>([]);
@@ -35,7 +37,6 @@ const WhoisTool: React.FC<WhoisToolProps> = ({ onBack, theme }) => {
   const [filterStatus, setFilterStatus] = useState<FilterStatus>('all');
 
   const handleLookup = async () => {
-    // Fix: Explicitly type domainList and use Set<string> to prevent 'unknown' type inference in bulk WHOIS lookup
     const domainList: string[] = Array.from(new Set<string>(
       domainsInput
         .split(/[\n,]/)
@@ -59,23 +60,37 @@ const WhoisTool: React.FC<WhoisToolProps> = ({ onBack, theme }) => {
     setResults(initialResults);
     setIsProcessing(true);
     setFilterStatus('all');
+    notify('info', `Starting optimized parallel audit for ${domainList.length} domains...`);
 
-    for (let i = 0; i < initialResults.length; i++) {
-      const current = initialResults[i];
-      setResults(prev => prev.map(r => r.id === current.id ? { ...r, loadingStatus: 'loading' } : r));
-
-      try {
-        const data = await lookupWhoisData(current.domain);
-        if (data) {
-          setResults(prev => prev.map(r => r.id === current.id ? { ...r, ...data, loadingStatus: 'success' } : r));
-        } else {
-          setResults(prev => prev.map(r => r.id === current.id ? { ...r, loadingStatus: 'not_found' } : r));
-        }
-      } catch (err) {
-        setResults(prev => prev.map(r => r.id === current.id ? { ...r, loadingStatus: 'error' } : r));
-      }
+    const CONCURRENCY_LIMIT = 5; // Process 5 domains at a time for speed balance
+    const batches = [];
+    for (let i = 0; i < initialResults.length; i += CONCURRENCY_LIMIT) {
+      batches.push(initialResults.slice(i, i + CONCURRENCY_LIMIT));
     }
+
+    for (const batch of batches) {
+      // Mark batch as loading
+      setResults(prev => prev.map(r => 
+        batch.some(b => b.id === r.id) ? { ...r, loadingStatus: 'loading' } : r
+      ));
+
+      // Process batch in parallel
+      await Promise.all(batch.map(async (item) => {
+        try {
+          const data = await lookupWhoisData(item.domain);
+          setResults(prev => prev.map(r => r.id === item.id ? { 
+            ...r, 
+            ...(data || {}), 
+            loadingStatus: data ? 'success' : 'not_found' 
+          } : r));
+        } catch (err) {
+          setResults(prev => prev.map(r => r.id === item.id ? { ...r, loadingStatus: 'error' } : r));
+        }
+      }));
+    }
+
     setIsProcessing(false);
+    notify('success', 'Bulk audit finalized.');
   };
 
   const filteredResults = useMemo(() => {
@@ -108,7 +123,7 @@ const WhoisTool: React.FC<WhoisToolProps> = ({ onBack, theme }) => {
             </div>
             <div>
               <h1 className="text-xl md:text-2xl font-bold tracking-tight uppercase">Bulk Domain Expiry</h1>
-              <p className="text-slate-500 text-[10px] font-black uppercase tracking-widest opacity-60">Global WHOIS & RDAP Audit</p>
+              <p className="text-slate-500 text-[10px] font-black uppercase tracking-widest opacity-60">High-Speed RDAP Architecture</p>
             </div>
           </div>
         </div>
@@ -127,9 +142,9 @@ const WhoisTool: React.FC<WhoisToolProps> = ({ onBack, theme }) => {
             <button
               onClick={handleLookup}
               disabled={isProcessing || !domainsInput.trim()}
-              className="w-full flex items-center justify-center gap-2 py-4 bg-amber-600 hover:bg-amber-500 text-white rounded-xl transition-all shadow-lg font-bold uppercase tracking-widest text-xs"
+              className="w-full flex items-center justify-center gap-2 py-4 bg-amber-600 hover:bg-amber-500 text-white rounded-xl transition-all shadow-lg font-bold uppercase tracking-widest text-xs disabled:opacity-50"
             >
-              {isProcessing ? <Loader2 className="animate-spin" /> : <Play size={16} />} Run Expiry Audit
+              {isProcessing ? <Loader2 className="animate-spin" size={16} /> : <Zap size={16} />} Run High-Speed Audit
             </button>
           </div>
         </div>
@@ -140,7 +155,7 @@ const WhoisTool: React.FC<WhoisToolProps> = ({ onBack, theme }) => {
               <div className="flex gap-2">
                 <button 
                   onClick={() => setFilterStatus('all')}
-                  className={`px-4 py-2 rounded-lg text-[10px] font-black uppercase tracking-[0.1em] transition-all min-w-[120px] ${filterStatus === 'all' ? 'bg-white text-slate-950 border-white' : 'bg-slate-900 border-[#1e293b] text-slate-400 hover:text-white'}`}
+                  className={`px-4 py-2 rounded-lg text-[10px] font-black uppercase tracking-[0.1em] transition-all min-w-[120px] ${filterStatus === 'all' ? 'bg-white text-slate-950 border-white shadow-md' : 'bg-slate-900 border-[#1e293b] text-slate-400 hover:text-white'}`}
                 >
                   ALL
                 </button>
@@ -148,7 +163,7 @@ const WhoisTool: React.FC<WhoisToolProps> = ({ onBack, theme }) => {
                   onClick={() => setFilterStatus('expiring')}
                   className={`px-4 py-2 rounded-lg text-[10px] font-black uppercase tracking-[0.1em] border transition-all min-w-[120px] ${filterStatus === 'expiring' ? 'bg-amber-600/20 text-amber-500 border-amber-500 shadow-lg' : 'bg-slate-900 border-amber-500/40 text-amber-500 hover:bg-amber-500/10'}`}
                 >
-                  EXPIRING / EXPIRED
+                  EXPIRING
                 </button>
               </div>
               
@@ -177,14 +192,14 @@ const WhoisTool: React.FC<WhoisToolProps> = ({ onBack, theme }) => {
                 </thead>
                 <tbody className={`divide-y ${isDark ? 'divide-[#1e293b]' : 'divide-slate-100'}`}>
                   {filteredResults.map((res) => (
-                    <tr key={res.id} className="hover:bg-slate-500/5 transition-colors group">
+                    <tr key={res.id} className="hover:bg-amber-500/5 transition-colors group">
                       <td className="px-6 py-4">
                         <div className="flex items-center gap-3">
                            <Globe size={14} className="text-slate-500" />
                            <span className={`text-sm font-bold tracking-tight ${isDark ? 'text-slate-100' : 'text-slate-900'}`}>{res.domain}</span>
                         </div>
                       </td>
-                      <td className="px-6 py-4 text-xs text-slate-500 font-bold">{res.registrar || '—'}</td>
+                      <td className="px-6 py-4 text-xs text-slate-500 font-bold truncate max-w-[150px]">{res.registrar || '—'}</td>
                       <td className="px-6 py-4 text-center">
                          <span className={`text-xs font-mono font-bold ${res.daysRemaining < 0 ? 'text-rose-500' : res.daysRemaining < 30 ? 'text-amber-500' : 'text-slate-500'}`}>
                            {res.expiryDate ? new Date(res.expiryDate).toLocaleDateString() : '—'}
@@ -213,7 +228,7 @@ const WhoisTool: React.FC<WhoisToolProps> = ({ onBack, theme }) => {
             {results.length === 0 && !isProcessing && (
               <div className="p-24 text-center">
                  <Calendar size={48} className="mx-auto text-slate-800 mb-4 opacity-20" />
-                 <p className="text-[10px] font-black uppercase text-slate-600 tracking-widest">Enter domain list to begin WHOIS audit</p>
+                 <p className="text-[10px] font-black uppercase text-slate-600 tracking-widest">Enter domain list to begin optimized audit</p>
               </div>
             )}
           </div>
