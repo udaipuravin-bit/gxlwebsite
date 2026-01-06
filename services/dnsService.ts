@@ -48,11 +48,12 @@ const getSpamhausToken = async (): Promise<string | null> => {
 };
 
 /**
- * Format Date exactly as requested: Tue, 06 Jan 2026 6:25 PM IST
+ * Format Date exactly as per user screenshot: Sat, 10 Jan, 2026, 2:32 pm IST
  */
 const formatDate = (unix: number): string => {
   const d = new Date(unix * 1000);
-  const formatter = new Intl.DateTimeFormat('en-GB', {
+  
+  const options: Intl.DateTimeFormatOptions = {
     weekday: 'short',
     day: '2-digit',
     month: 'short',
@@ -61,8 +62,9 @@ const formatDate = (unix: number): string => {
     minute: '2-digit',
     hour12: true,
     timeZone: 'Asia/Kolkata'
-  });
+  };
 
+  const formatter = new Intl.DateTimeFormat('en-GB', options);
   const parts = formatter.formatToParts(d);
   const findPart = (type: string) => parts.find(p => p.type === type)?.value || '';
 
@@ -72,9 +74,10 @@ const formatDate = (unix: number): string => {
   const year = findPart('year');
   const hour = findPart('hour');
   const minute = findPart('minute');
-  const ampm = (parts.find(p => p.type === 'dayPeriod')?.value || '').toUpperCase();
+  const ampm = (parts.find(p => p.type === 'dayPeriod')?.value || '').toLowerCase();
 
-  return `${weekday}, ${day} ${month} ${year} ${hour}:${minute} ${ampm} IST`;
+  // Exactly matching screenshot format: "Sat, 10 Jan, 2026, 2:32 pm IST"
+  return `${weekday}, ${day} ${month}, ${year}, ${hour}:${minute} ${ampm} IST`;
 };
 
 /**
@@ -146,7 +149,7 @@ const getSpamhausReason = (code: string, dataset: string): string => {
 };
 
 /**
- * IP History: Strictly XBL/CSS only. XBL Priority.
+ * IP History: Returns ALL XBL/CSS entries found in the timeline.
  */
 export const getIPReleaseDate = async (ip: string): Promise<{ text: string, data: any }> => {
   const token = await getSpamhausToken();
@@ -160,10 +163,10 @@ export const getIPReleaseDate = async (ip: string): Promise<{ text: string, data
     });
     const data = await res.json();
     
-    // Support both { results: [] } and [] formats
     const results = Array.isArray(data) ? data : (data.results && Array.isArray(data.results) ? data.results : []);
 
     if (results.length > 0) {
+      // Filter for XBL and CSS only.
       const validEntries = results.filter((e: any) => {
         const ds = (e.dataset || '').toUpperCase();
         return ds.includes('XBL') || ds.includes('CSS');
@@ -171,15 +174,18 @@ export const getIPReleaseDate = async (ip: string): Promise<{ text: string, data
 
       if (validEntries.length === 0) return { text: '—', data: null };
 
-      // Prioritize XBL over CSS
+      // Requirement: Show all available entries (e.g. XBL and CSS) as multiple lines
+      // Sort: XBL first then CSS
       const prioritized = validEntries.sort((a: any, b: any) => {
         if (a.dataset.toUpperCase().includes('XBL')) return -1;
         if (b.dataset.toUpperCase().includes('XBL')) return 1;
         return 0;
       });
 
-      const entry = prioritized[0];
-      const html = `<div><strong>${entry.dataset.toUpperCase()}</strong> : ${formatDate(entry.valid_until)}</div>`;
+      const html = prioritized.map((entry: any) => {
+        return `<div class="mb-1 last:mb-0"><strong class="text-rose-500">${entry.dataset.toUpperCase()}</strong> : ${formatDate(entry.valid_until)}</div>`;
+      }).join('');
+
       return { text: html, data: prioritized };
     }
     return { text: '—', data: null };
@@ -203,12 +209,11 @@ export const getDomainReleaseDate = async (domain: string): Promise<{ text: stri
     });
     const data = await res.json();
     
-    // Check direct timestamp, nested results, or raw array
     const results = Array.isArray(data) ? data : (data.results && Array.isArray(data.results) ? data.results : []);
     const timestamp = data['listed-until'] || (results[0] ? (results[0].valid_until || results[0]['listed-until']) : null);
     
     if (timestamp) {
-      const html = `<div><strong>DBL</strong> : ${formatDate(timestamp)}</div>`;
+      const html = `<div><strong class="text-rose-500">DBL</strong> : ${formatDate(timestamp)}</div>`;
       return { text: html, data };
     }
     

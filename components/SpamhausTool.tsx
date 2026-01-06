@@ -87,7 +87,7 @@ const SpamhausTool: React.FC<SpamhausToolProps> = ({ onBack, theme }) => {
           status = isHighRisk ? 'listed-high' : 'listed-low';
         }
 
-        // REQUIREMENT: Only fetch release date for XBL, CSS, or DBL
+        // Logic Filter: Only fetch release date for XBL, CSS, or DBL
         const historyAllowed = allLists.some(list => {
           const u = list.toUpperCase();
           return u.includes('XBL') || u.includes('CSS') || u.includes('DBL');
@@ -96,14 +96,14 @@ const SpamhausTool: React.FC<SpamhausToolProps> = ({ onBack, theme }) => {
         const baseResult: Partial<SpamhausResult> = {
           listed: isListed,
           datasets: isListed ? allLists : ['None'],
-          reason: isListed ? reasons.join('; ') : 'NOT LISTED',
+          reason: isListed ? Array.from(new Set(reasons)).join('; ') : 'NOT LISTED',
           status: status,
           releaseDate: (isListed && historyAllowed) ? 'pending_history' : '—'
         };
 
         setResults(prev => prev.map(r => r.input === target ? { ...r, ...baseResult } as SpamhausResult : r));
 
-        // BACKGROUND FETCH FOR RELEASE DATES
+        // Background history fetch only if allowed
         if (isListed && historyAllowed) {
           (async () => {
             try {
@@ -208,7 +208,7 @@ const SpamhausTool: React.FC<SpamhausToolProps> = ({ onBack, theme }) => {
                   <th className="px-6 py-4">Forensic Identifier</th>
                   <th className="px-6 py-4 text-center">Listed</th>
                   <th className="px-6 py-4">Dataset(s)</th>
-                  <th className="px-6 py-4">Release Timeline (IST)</th>
+                  <th className="px-6 py-4 min-w-[320px]">Release Timeline (IST)</th>
                 </tr>
               </thead>
               <tbody className={`divide-y ${isDark ? 'divide-[#1e293b]' : 'divide-slate-100'}`}>
@@ -263,7 +263,7 @@ const ReleaseDateCell: React.FC<{ releaseDate?: string; listed: boolean }> = ({ 
   }
   return (
     <div 
-      className="text-[10px] font-mono leading-relaxed"
+      className="text-[11px] font-medium leading-relaxed font-sans"
       dangerouslySetInnerHTML={{ __html: releaseDate }}
     />
   );
