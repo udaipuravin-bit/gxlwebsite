@@ -44,7 +44,8 @@ const MxTool: React.FC<MxToolProps> = ({ onBack, theme }) => {
   const [filterProvider, setFilterProvider] = useState<string | null>(null);
 
   const handleLookup = async () => {
-    const domainList = Array.from(new Set(
+    // Fix: Explicitly type domainList and use Set<string> to prevent 'unknown' type inference in bulk lookup
+    const domainList: string[] = Array.from(new Set<string>(
       domainsInput
         .split(/[\n,]/)
         .map(d => d.trim().toLowerCase().replace(/^(https?:\/\/)/, '').replace(/\/$/, ''))
@@ -99,7 +100,8 @@ const MxTool: React.FC<MxToolProps> = ({ onBack, theme }) => {
       return acc;
     }, {} as Record<string, number>);
 
-    const providerList = Object.entries(providerCounts)
+    // Fix: Explicitly cast counts for arithmetic operation in sort to satisfy TS compiler
+    const providerList = (Object.entries(providerCounts) as [string, number][])
       .sort((a, b) => b[1] - a[1])
       .map(([name, count]) => ({ name, count }));
 
@@ -199,7 +201,7 @@ const MxTool: React.FC<MxToolProps> = ({ onBack, theme }) => {
           {results.length > 0 && (
             <div className={`p-6 rounded-2xl shadow-xl border space-y-6 ${cardClasses}`}>
               <div>
-                <h4 className="text-[10px] uppercase font-black text-slate-500 tracking-widest flex items-center gap-2 mb-4">
+                <h4 className="text-[10px] uppercase font-black text-slate-500 tracking-widest mb-4">
                   <FileText size={12}/> Analysis Stats
                 </h4>
                 <div className="grid grid-cols-2 gap-3">

@@ -46,9 +46,12 @@ const SpfTool: React.FC<SpfToolProps> = ({ onBack, theme }) => {
 
   const handleProcess = async () => {
     if (!domainsInput.trim()) return;
-    const domainList = Array.from(new Set(
+    
+    // Fix: Explicitly type domainList and use Set<string> to prevent 'unknown' type inference in bulk validation
+    const domainList: string[] = Array.from(new Set<string>(
       domainsInput.split(/[\n,]/).map(d => d.trim().toLowerCase()).filter(d => d.length > 0)
     ));
+    
     const initialResults: SpfResult[] = domainList.map((domain, index) => ({
       id: index + 1, domain, record: '', status: 'pending', lookupCount: 0, mechanism: ''
     }));

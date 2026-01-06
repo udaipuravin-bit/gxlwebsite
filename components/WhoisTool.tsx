@@ -35,7 +35,8 @@ const WhoisTool: React.FC<WhoisToolProps> = ({ onBack, theme }) => {
   const [filterStatus, setFilterStatus] = useState<FilterStatus>('all');
 
   const handleLookup = async () => {
-    const domainList = Array.from(new Set(
+    // Fix: Explicitly type domainList and use Set<string> to prevent 'unknown' type inference in bulk WHOIS lookup
+    const domainList: string[] = Array.from(new Set<string>(
       domainsInput
         .split(/[\n,]/)
         .map(d => d.trim().toLowerCase().replace(/^(https?:\/\/)/, '').replace(/\/$/, ''))

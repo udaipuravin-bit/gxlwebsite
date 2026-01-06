@@ -79,7 +79,8 @@ const SubjectEncoderTool: React.FC<SubjectEncoderToolProps> = ({ onBack, theme }
       }
     };
 
-    const words = subject.split(/\s+/);
+    // Fix: Explicitly type words as string[] to ensure downstream operations like slice/join/forEach work with string types
+    const words: string[] = subject.split(/\s+/);
     const mid = Math.floor(subject.length / 2);
 
     // --- COLLECTION 1: BASE64 VARIANTS ---
@@ -135,9 +136,11 @@ const SubjectEncoderTool: React.FC<SubjectEncoderToolProps> = ({ onBack, theme }
 
     // --- COLLECTION 4: MULTI-CHARSET CHAINS ---
     const primaryCharsets = ["UTF-8", "ISO-8859-1", "Windows-1252", "US-ASCII", "KOI8-R"];
-    addUnique('UTF-8 + ISO Word Split', encodeRFC2047(words[0], 'B', 'UTF-8') + ' ' + encodeRFC2047(words.slice(1).join(' '), 'B', 'ISO-8859-1'), 4);
+    // Fix: Explicitly cast array elements to string to satisfy encodeRFC2047 parameter expectations and avoid unknown type error
+    addUnique('UTF-8 + ISO Word Split', encodeRFC2047(words[0] as string, 'B', 'UTF-8') + ' ' + encodeRFC2047(words.slice(1).join(' ') as string, 'B', 'ISO-8859-1'), 4);
     
-    let multiChain = [];
+    // Fix: Explicitly type multiChain as string[] to prevent unknown assignment errors
+    let multiChain: string[] = [];
     words.forEach((w, i) => {
       const charset = primaryCharsets[i % primaryCharsets.length];
       multiChain.push(encodeRFC2047(w, 'B', charset));

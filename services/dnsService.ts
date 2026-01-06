@@ -1,4 +1,3 @@
-
 import { DnsResponse, DnsLookupEntry, MxRecord, WhoisResult, PtrResult, CaaRecord } from '../types';
 
 const RECORD_TYPE_MAP: Record<string, number> = {
@@ -30,7 +29,7 @@ const getCaaDescription = (tag: string, value: string): string => {
     return `CAs can contact the domain owner via ${cleanValue}.`;
   }
   if (cleanTag === 'contactphone') {
-    return `CAs can contact the domain owner at ${cleanValue}.`;
+    return `CAs can contact the owner at ${cleanValue}.`;
   }
   return `Custom policy defined for property: ${tag}.`;
 };
@@ -59,22 +58,15 @@ const ipToArpa = (ip: string): string | null => {
   if (ipv4Regex.test(ip)) {
     return ip.split('.').reverse().join('.') + '.in-addr.arpa';
   }
-  if (ip.includes(':')) {
-    return ip; 
-  }
   return null;
 };
 
 export const lookupDkimRecord = async (domain: string, selector: string): Promise<string | null> => {
-  const cleanDomain = domain.trim().toLowerCase();
-  const cleanSelector = selector.trim();
-  if (!cleanDomain || !cleanSelector) return null;
-  const queryUrl = `https://dns.google/resolve?name=${cleanSelector}._domainkey.${cleanDomain}&type=TXT`;
+  const queryUrl = `https://dns.google/resolve?name=${selector}._domainkey.${domain}&type=TXT`;
   try {
     const response = await fetch(queryUrl);
-    if (!response.ok) throw new Error('DNS lookup failed');
     const data: DnsResponse = await response.json();
-    if (data.Status === 0 && data.Answer && data.Answer.length > 0) {
+    if (data.Status === 0 && data.Answer) {
       return data.Answer.map(ans => ans.data.replace(/"/g, '')).join('');
     }
     return null;
@@ -85,18 +77,13 @@ export const lookupDkimRecord = async (domain: string, selector: string): Promis
 };
 
 export const lookupDmarcRecord = async (domain: string): Promise<string | null> => {
-  const cleanDomain = domain.trim().toLowerCase();
-  if (!cleanDomain) return null;
-  const queryUrl = `https://dns.google/resolve?name=_dmarc.${cleanDomain}&type=TXT`;
+  const queryUrl = `https://dns.google/resolve?name=_dmarc.${domain}&type=TXT`;
   try {
     const response = await fetch(queryUrl);
-    if (!response.ok) throw new Error('DNS lookup failed');
     const data: DnsResponse = await response.json();
-    if (data.Status === 0 && data.Answer && data.Answer.length > 0) {
-      const dmarcRecord = data.Answer
-        .map(ans => ans.data.replace(/"/g, ''))
-        .find(txt => txt.toUpperCase().startsWith('V=DMARC1'));
-      return dmarcRecord || (data.Answer[0]?.data.replace(/"/g, '') || null);
+    if (data.Status === 0 && data.Answer) {
+      const dmarc = data.Answer.map(ans => ans.data.replace(/"/g, '')).find(txt => txt.toUpperCase().startsWith('V=DMARC1'));
+      return dmarc || null;
     }
     return null;
   } catch (error) {
@@ -106,18 +93,13 @@ export const lookupDmarcRecord = async (domain: string): Promise<string | null> 
 };
 
 export const lookupSpfRecord = async (domain: string): Promise<string | null> => {
-  const cleanDomain = domain.trim().toLowerCase();
-  if (!cleanDomain) return null;
-  const queryUrl = `https://dns.google/resolve?name=${cleanDomain}&type=TXT`;
+  const queryUrl = `https://dns.google/resolve?name=${domain}&type=TXT`;
   try {
     const response = await fetch(queryUrl);
-    if (!response.ok) throw new Error('DNS lookup failed');
     const data: DnsResponse = await response.json();
-    if (data.Status === 0 && data.Answer && data.Answer.length > 0) {
-      const spfRecord = data.Answer
-        .map(ans => ans.data.replace(/"/g, ''))
-        .find(txt => txt.toLowerCase().startsWith('v=spf1'));
-      return spfRecord || null;
+    if (data.Status === 0 && data.Answer) {
+      const spf = data.Answer.map(ans => ans.data.replace(/"/g, '')).find(txt => txt.toLowerCase().startsWith('v=spf1'));
+      return spf || null;
     }
     return null;
   } catch (error) {
@@ -127,13 +109,11 @@ export const lookupSpfRecord = async (domain: string): Promise<string | null> =>
 };
 
 export const lookupRecordByType = async (domain: string, type: string): Promise<DnsLookupEntry[]> => {
-  const cleanDomain = domain.trim().toLowerCase().replace(/^(https?:\/\/)/, '').replace(/\/$/, '');
   const typeId = RECORD_TYPE_MAP[type];
-  if (!cleanDomain || !typeId) return [];
-  const queryUrl = `https://dns.google/resolve?name=${cleanDomain}&type=${typeId}`;
+  if (!typeId) return [];
+  const queryUrl = `https://dns.google/resolve?name=${domain}&type=${typeId}`;
   try {
     const response = await fetch(queryUrl);
-    if (!response.ok) throw new Error('DNS lookup failed');
     const data: DnsResponse = await response.json();
     if (data.Status === 0 && data.Answer) {
       return data.Answer.map(ans => ({
@@ -151,23 +131,16 @@ export const lookupRecordByType = async (domain: string, type: string): Promise<
 };
 
 export const lookupCaaRecords = async (domain: string): Promise<CaaRecord[]> => {
-  const cleanDomain = domain.trim().toLowerCase().replace(/^(https?:\/\/)/, '').replace(/\/$/, '');
-  if (!cleanDomain) return [];
-  
-  const queryUrl = `https://dns.google/resolve?name=${cleanDomain}&type=257`;
+  const queryUrl = `https://dns.google/resolve?name=${domain}&type=257`;
   try {
     const response = await fetch(queryUrl);
-    if (!response.ok) throw new Error('DNS lookup failed');
     const data: DnsResponse = await response.json();
-    
     if (data.Status === 0 && data.Answer) {
       return data.Answer.map(ans => {
-        // Data format: "0 issue \"letsencrypt.org\""
         const parts = ans.data.split(/\s+/);
         const flag = parseInt(parts[0], 10);
         const tag = parts[1];
         const value = parts.slice(2).join(' ').replace(/"/g, '');
-        
         return {
           flag,
           tag,
@@ -184,26 +157,21 @@ export const lookupCaaRecords = async (domain: string): Promise<CaaRecord[]> => 
 };
 
 export const lookupMxRecords = async (domain: string): Promise<MxRecord[]> => {
-  const cleanDomain = domain.trim().toLowerCase().replace(/^(https?:\/\/)/, '').replace(/\/$/, '');
-  if (!cleanDomain) return [];
-  const queryUrl = `https://dns.google/resolve?name=${cleanDomain}&type=15`;
+  const queryUrl = `https://dns.google/resolve?name=${domain}&type=15`;
   try {
     const response = await fetch(queryUrl);
-    if (!response.ok) throw new Error('DNS lookup failed');
     const data: DnsResponse = await response.json();
     if (data.Status === 0 && data.Answer) {
-      return data.Answer
-        .map(ans => {
-          const parts = ans.data.split(/\s+/);
-          const priority = parseInt(parts[0], 10);
-          const exchange = (parts[1] || '').replace(/\.$/, '');
-          return {
-            priority,
-            exchange,
-            provider: detectProvider(exchange)
-          };
-        })
-        .sort((a, b) => a.priority - b.priority);
+      return data.Answer.map(ans => {
+        const parts = ans.data.split(/\s+/);
+        const priority = parseInt(parts[0], 10);
+        const exchange = (parts[1] || '').replace(/\.$/, '');
+        return {
+          priority,
+          exchange,
+          provider: detectProvider(exchange)
+        };
+      }).sort((a, b) => a.priority - b.priority);
     }
     return [];
   } catch (error) {
@@ -213,14 +181,11 @@ export const lookupMxRecords = async (domain: string): Promise<MxRecord[]> => {
 };
 
 export const lookupPtrRecord = async (ip: string): Promise<string | null> => {
-  const cleanIp = ip.trim();
-  const arpaName = ipToArpa(cleanIp);
+  const arpaName = ipToArpa(ip);
   if (!arpaName) return null;
-
   const queryUrl = `https://dns.google/resolve?name=${arpaName}&type=12`;
   try {
     const response = await fetch(queryUrl);
-    if (!response.ok) throw new Error('DNS lookup failed');
     const data: DnsResponse = await response.json();
     if (data.Status === 0 && data.Answer && data.Answer.length > 0) {
       return data.Answer[0].data.replace(/\.$/, '');
@@ -232,56 +197,122 @@ export const lookupPtrRecord = async (ip: string): Promise<string | null> => {
   }
 };
 
-// Fix: Update lookupWhoisData return type to use Omit<WhoisResult, 'id' | 'loadingStatus'> as the returned object contains core data but not UI state properties.
 export const lookupWhoisData = async (domain: string): Promise<Omit<WhoisResult, 'id' | 'loadingStatus'> | null> => {
-  const cleanDomain = domain.trim().toLowerCase().replace(/^(https?:\/\/)/, '').replace(/\/$/, '');
-  if (!cleanDomain) return null;
-
-  const queryUrl = `https://rdap.org/domain/${cleanDomain}`;
-
+  const queryUrl = `https://rdap.org/domain/${domain}`;
   try {
     const response = await fetch(queryUrl);
-    if (!response.ok) {
-      if (response.status === 404) return null;
-      throw new Error('WHOIS/RDAP lookup failed');
-    }
+    if (!response.ok) return null;
     const data = await response.json();
-
     const events = data.events || [];
-    const expirationEvent = events.find((e: any) => e.eventAction === 'expiration');
-    const registrationEvent = events.find((e: any) => e.eventAction === 'registration');
-    
+    const expiration = events.find((e: any) => e.eventAction === 'expiration');
+    const registration = events.find((e: any) => e.eventAction === 'registration');
     const entities = data.entities || [];
     const registrarEntity = entities.find((e: any) => e.roles && e.roles.includes('registrar'));
     let registrarName = 'Unknown';
-    
     if (registrarEntity && registrarEntity.vcardArray) {
-      const vcard = registrarEntity.vcardArray[1] || [];
-      const fnEntry = vcard.find((entry: any) => entry[0] === 'fn');
+      const fnEntry = (registrarEntity.vcardArray[1] || []).find((entry: any) => entry[0] === 'fn');
       if (fnEntry) registrarName = fnEntry[3];
     }
-
-    const expiryDate = expirationEvent ? expirationEvent.eventDate : '';
-    const createdDate = registrationEvent ? registrationEvent.eventDate : '';
-    
+    const expiryDate = expiration ? expiration.eventDate : '';
+    const createdDate = registration ? registration.eventDate : '';
     let daysRemaining = 0;
     if (expiryDate) {
       const diff = new Date(expiryDate).getTime() - new Date().getTime();
-      // REMOVED Math.max(0, ...) to allow negative values for expired domains
       daysRemaining = Math.ceil(diff / (1000 * 60 * 60 * 24));
     }
-
     return {
-      domain: cleanDomain,
-      registrar: registrarName,
-      createdDate,
-      expiryDate,
-      daysRemaining,
-      status: data.status || [],
-      raw: data
+      domain, registrar: registrarName, createdDate, expiryDate, daysRemaining,
+      status: data.status || [], raw: data
     };
   } catch (error) {
     console.error(`Error fetching WHOIS for ${domain}:`, error);
     throw error;
   }
+};
+
+/**
+ * Spamhaus DQS Query Implementation
+ */
+export const lookupSpamhausReputation = async (input: string, type: 'ip' | 'domain', dqsKey: string): Promise<{ dataset: string; reason: string; codes: string[]; listed: boolean }[]> => {
+  const results: { dataset: string; reason: string; codes: string[]; listed: boolean }[] = [];
+
+  const dnsQuery = async (hostname: string) => {
+    try {
+      const resp = await fetch(`https://dns.google/resolve?name=${hostname}&type=A`);
+      const data: DnsResponse = await resp.json();
+      if (data.Status === 5) throw new Error('Query Limit Exceeded or Unauthorized Key');
+      return data.Answer || [];
+    } catch (e: any) {
+      if (e.message.includes('Limit')) throw e;
+      return [];
+    }
+  };
+
+  if (type === 'ip') {
+    const reversedIp = input.split('.').reverse().join('.');
+    const zenHostname = `${reversedIp}.${dqsKey}.zen.dq.spamhaus.net`;
+    const answers = await dnsQuery(zenHostname);
+    
+    if (answers.length > 0) {
+      const codes = answers.map(a => a.data);
+      const datasetParts: string[] = [];
+      const reasons: string[] = [];
+      
+      codes.forEach(code => {
+        if (code === '127.0.0.2') { datasetParts.push('SBL'); reasons.push('SBL (Spamhaus Block List)'); }
+        else if (code === '127.0.0.3') { datasetParts.push('SBL-CSS'); reasons.push('SBL-CSS (Spamhaus CSS)'); }
+        else if (code === '127.0.0.9') { datasetParts.push('DROP'); reasons.push('DROP (Don\'t Route Or Peer)'); }
+        else if (code === '127.0.0.4') { datasetParts.push('XBL'); reasons.push('XBL (Exploits Block List)'); }
+        else if (code === '127.0.0.10') { datasetParts.push('PBL'); reasons.push('PBL (Policy Block List - ISP)'); }
+        else if (code === '127.0.0.11') { datasetParts.push('PBL'); reasons.push('PBL (Policy Block List - SH)'); }
+        else if (code === '127.0.0.20') { datasetParts.push('AuthBL'); reasons.push('AuthBL (Authenticating Block List)'); }
+      });
+
+      results.push({
+        dataset: `ZEN (${[...new Set(datasetParts)].join(', ')})`,
+        reason: reasons.join(', '),
+        codes,
+        listed: true
+      });
+    }
+  } else {
+    // DBL Logic
+    const dblHostname = `${input}.${dqsKey}.dbl.dq.spamhaus.net`;
+    const dblAnswers = await dnsQuery(dblHostname);
+    if (dblAnswers.length > 0) {
+      const codes = dblAnswers.map(a => a.data);
+      let reason = 'Bad / Low Reputation';
+      if (codes.some(c => {
+        const last = parseInt(c.split('.').pop() || '0');
+        return last >= 102 && last <= 199;
+      })) {
+        reason = 'Abused but Legitimate';
+      } else if (codes.some(c => c === '127.0.1.255')) {
+        reason = 'Invalid query (IP used instead of domain)';
+      }
+      results.push({ dataset: 'DBL', reason, codes, listed: true });
+    }
+
+    // ZRD Logic
+    const zrdHostname = `${input}.${dqsKey}.zrd.dq.spamhaus.net`;
+    const zrdAnswers = await dnsQuery(zrdHostname);
+    if (zrdAnswers.length > 0) {
+      const codes = zrdAnswers.map(a => a.data);
+      const last = parseInt(codes[0].split('.').pop() || '0');
+      // 127.0.2.2 - 127.0.2.24
+      const hours = last - 2; 
+      results.push({ 
+        dataset: 'ZRD', 
+        reason: `Zero Reputation Domain (first observed ${hours} hours ago)`, 
+        codes, 
+        listed: true 
+      });
+    }
+  }
+
+  if (results.length === 0) {
+    results.push({ dataset: 'None', reason: 'NOT LISTED', codes: [], listed: false });
+  }
+
+  return results;
 };

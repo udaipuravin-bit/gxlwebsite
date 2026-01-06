@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import { 
   ArrowLeft, 
@@ -22,6 +21,7 @@ import {
 } from 'lucide-react';
 import Editor from '@monaco-editor/react';
 import { processMimeContent } from '../services/mimeService';
+import { useNotify } from '../App';
 
 interface EmailMasterToolProps {
   onBack: () => void;
@@ -70,6 +70,7 @@ const DEFAULT_HTML = `<!DOCTYPE html>
 </html>`;
 
 const EmailMasterTool: React.FC<EmailMasterToolProps> = ({ onBack, theme: initialTheme }) => {
+  const { notify } = useNotify();
   const [code, setCode] = useState(DEFAULT_HTML);
   const [activeTheme, setActiveTheme] = useState<'dark' | 'light'>(initialTheme);
   const [splitPosition, setSplitPosition] = useState(50);
@@ -139,8 +140,9 @@ const EmailMasterTool: React.FC<EmailMasterToolProps> = ({ onBack, theme: initia
     try {
       const decoded = processMimeContent(code, action, 'decode');
       setCode(decoded);
+      notify('success', `Content decoded using ${action === 'auto' ? 'Auto-detection' : action}.`);
     } catch (err) {
-      alert("Decoding failed.");
+      notify('error', 'Decoding failed. Please check the source format.');
     }
   };
 
@@ -192,10 +194,15 @@ const EmailMasterTool: React.FC<EmailMasterToolProps> = ({ onBack, theme: initia
     a.download = 'email_master_export.html';
     a.click();
     URL.revokeObjectURL(url);
+    notify('success', 'HTML export initiated.');
   };
 
   const resetEditor = () => {
-    if (confirm("Reset editor to default template?")) setCode(DEFAULT_HTML);
+    // Replaced confirm with internal logic for cleaner UI, could use a modal but simple for now
+    if (code !== DEFAULT_HTML) {
+      setCode(DEFAULT_HTML);
+      notify('info', 'Editor reset to default template.');
+    }
   };
 
   const isDark = activeTheme === 'dark';
@@ -220,7 +227,7 @@ const EmailMasterTool: React.FC<EmailMasterToolProps> = ({ onBack, theme: initia
     bracketPairColorization: { enabled: true },
     suggest: { showWords: false, snippetsPreventQuickSuggestions: true },
     quickSuggestions: false,
-    fixedOverflowWidgets: true, // Crucial for multi-pane layouts to allow widgets to escape container bounds
+    fixedOverflowWidgets: true, 
     renderLineHighlight: "all" as const,
     hideCursorInOverviewRuler: true,
     scrollbar: {
@@ -253,7 +260,7 @@ const EmailMasterTool: React.FC<EmailMasterToolProps> = ({ onBack, theme: initia
           <div className="flex items-center gap-1">
              <ToolButton onClick={() => setCode(code)} icon={<Play size={14}/>} label="Run" color="emerald" isDark={isDark} />
              <ToolButton onClick={resetEditor} icon={<RotateCcw size={14}/>} label="Reset" isDark={isDark} />
-             <ToolButton onClick={() => { navigator.clipboard.writeText(code); setCopied(true); setTimeout(() => setCopied(false), 2000); }} icon={copied ? <Check size={14} className="text-emerald-500"/> : <Copy size={14}/>} label={copied ? "Copied" : "Copy"} isDark={isDark} />
+             <ToolButton onClick={() => { navigator.clipboard.writeText(code); setCopied(true); setTimeout(() => setCopied(false), 2000); notify('success', 'Code copied to clipboard.'); }} icon={copied ? <Check size={14} className="text-emerald-500"/> : <Copy size={14}/>} label={copied ? "Copied" : "Copy"} isDark={isDark} />
              <ToolButton onClick={downloadHtml} icon={<Download size={14}/>} label="Export" isDark={isDark} />
              <ToolButton onClick={triggerFind} icon={<Search size={14}/>} label="Find & Replace" isDark={isDark} />
           </div>
@@ -268,7 +275,7 @@ const EmailMasterTool: React.FC<EmailMasterToolProps> = ({ onBack, theme: initia
           <button onClick={toggleTheme} className={`p-2 rounded-lg hover:bg-slate-500/10 transition-colors ${isDark ? 'text-yellow-400' : 'text-slate-600'}`}>
             {isDark ? <Sun size={18} /> : <Moon size={18} />}
           </button>
-          <button onClick={() => setJsEnabled(!jsEnabled)} className={`p-2 rounded-lg hover:bg-slate-500/10 transition-colors ${jsEnabled ? 'text-emerald-400' : 'text-slate-50'}`}>
+          <button onClick={() => { setJsEnabled(!jsEnabled); notify('info', `JS execution ${!jsEnabled ? 'enabled' : 'disabled'} in preview.`); }} className={`p-2 rounded-lg hover:bg-slate-500/10 transition-colors ${jsEnabled ? 'text-emerald-400' : 'text-slate-50'}`}>
             {jsEnabled ? <Unlock size={18}/> : <Lock size={18}/>}
           </button>
         </div>

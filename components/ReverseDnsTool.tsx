@@ -40,7 +40,8 @@ const ReverseDnsTool: React.FC<ReverseDnsToolProps> = ({ onBack, theme }) => {
   };
 
   const handleLookup = async () => {
-    const ipList = Array.from(new Set(
+    // Fix: Explicitly type ipList and use Set<string> to prevent 'unknown' type inference in bulk PTR lookup
+    const ipList: string[] = Array.from(new Set<string>(
       ipInput
         .split(/[\n,]/)
         .map(ip => ip.trim())
@@ -52,7 +53,8 @@ const ReverseDnsTool: React.FC<ReverseDnsToolProps> = ({ onBack, theme }) => {
     const initialResults: PtrResult[] = ipList.map(ip => ({
       ip,
       hostname: '',
-      status: validateIp(ip) ? 'pending' : 'invalid'
+      // Fix: Explicitly cast ip to string for validateIp call to avoid unknown type error
+      status: validateIp(ip as string) ? 'pending' : 'invalid'
     }));
 
     setResults(initialResults);

@@ -198,3 +198,14 @@ export interface SubjectEncodingResult {
 }
 
 export type EmailMasterAction = 'optimize' | 'fix' | 'decode' | 'validate' | 'write';
+
+export interface SpamhausResult {
+  id: number;
+  input: string;
+  type: 'ip' | 'domain';
+  listed: boolean;
+  datasets: string[];
+  reason: string;
+  codes: string[];
+  status: 'clean' | 'listed-high' | 'listed-low' | 'pending' | 'loading' | 'error';
+}
