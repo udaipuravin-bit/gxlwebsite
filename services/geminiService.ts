@@ -1,7 +1,7 @@
-
-import { GoogleGenAI } from "@google/genai";
+import {GoogleGenAI} from "@google/genai";
 import { EmailMasterAction } from "../types";
 
+// Fixed imports and ensuring strict compliance with Gemini SDK guidelines
 const SYSTEM_INSTRUCTION = `You are an expert HTML Email Engineer and Email Deliverability Specialist.
 Your role is to assist users inside a browser-based HTML Email Editor with:
 - Writing
@@ -22,7 +22,7 @@ CORE RESPONSIBILITIES
 8. Tone: Concise and technical.`;
 
 export const processEmailWithAI = async (content: string, action: EmailMasterAction): Promise<string> => {
-  // Fix: Strictly following Gemini SDK initialization guidelines by using process.env.API_KEY directly.
+  // Use the API key exclusively from process.env.API_KEY. Always initialize GoogleGenAI inside the call.
   const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
   
   let prompt = "";
@@ -55,5 +55,6 @@ export const processEmailWithAI = async (content: string, action: EmailMasterAct
     },
   });
 
+  // Accessing the .text property directly as per extracts text output guidelines
   return response.text || "";
 };

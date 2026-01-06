@@ -1,3 +1,4 @@
+
 import React, { useState, useRef, useEffect } from 'react';
 import { 
   ChevronDown, 
@@ -21,7 +22,8 @@ import {
   Type,
   Search as SearchIcon,
   FileCode2,
-  AlertOctagon
+  AlertOctagon,
+  ShieldAlert
 } from 'lucide-react';
 
 interface NavbarProps {
@@ -42,7 +44,7 @@ const Navbar: React.FC<NavbarProps> = ({ onNavigate, theme, onToggleTheme }) => 
       { id: 'dkim-checker', name: 'Bulk DKIM', icon: <ShieldCheck size={16} />, color: 'text-emerald-400' },
       { id: 'spf-validator', name: 'SPF Validator', icon: <Globe size={16} />, color: 'text-amber-400' },
       { id: 'dmarc-checker', name: 'DMARC Audit', icon: <BarChart3 size={16} />, color: 'text-sky-400' },
-      { id: 'spamhaus-checker', name: 'Spamhaus DQS', icon: <AlertOctagon size={16} />, color: 'text-rose-500' },
+      { id: 'spamhaus-checker', name: 'Spamhaus Blacklist', icon: <ShieldAlert size={16} />, color: 'text-rose-500' },
       { id: 'caa-checker', name: 'CAA Policy', icon: <FileCheck size={16} />, color: 'text-teal-400' },
     ],
     infrastructure: [

@@ -1,3 +1,4 @@
+
 import React from 'react';
 import { 
   ShieldCheck, 
@@ -17,7 +18,8 @@ import {
   Shield,
   Type,
   FileCode2,
-  AlertOctagon
+  AlertOctagon,
+  ShieldAlert
 } from 'lucide-react';
 
 interface HomeProps {
@@ -69,9 +71,9 @@ const Home: React.FC<HomeProps> = (props) => {
           <ToolCard 
             theme={props.theme}
             onClick={props.onLaunchSpamhaus} 
-            icon={<AlertOctagon size={32} />} 
-            title="Spamhaus DQS" 
-            desc="Professional Datafeed IP & Domain reputation matrix." 
+            icon={<ShieldAlert size={32} />} 
+            title="Spamhaus Blacklist" 
+            desc="High-fidelity bulk IP & Domain blacklist audit." 
             colorClass="text-rose-500"
             glowClass="bg-rose-500/10"
           />

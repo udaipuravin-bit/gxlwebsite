@@ -1,4 +1,3 @@
-
 import { DnsResponse, DnsLookupEntry, MxRecord, WhoisResult, PtrResult, CaaRecord } from '../types';
 
 const RECORD_TYPE_MAP: Record<string, number> = {
@@ -12,6 +11,9 @@ const RECORD_TYPE_MAP: Record<string, number> = {
   'PTR': 12,
   'CAA': 257
 };
+
+// Internal DQS Master Key (Updated to the provided 26-char string)
+const DQS_INTERNAL_KEY = 'cnrmf6qnuzmpx57lve7mtvhr2q';
 
 const getCaaDescription = (tag: string, value: string): string => {
   const cleanTag = tag.toLowerCase();
@@ -60,6 +62,21 @@ const ipToArpa = (ip: string): string | null => {
     return ip.split('.').reverse().join('.') + '.in-addr.arpa';
   }
   return null;
+};
+
+const reverseIpv6 = (ip: string): string => {
+  // Expand IPv6
+  const parts = ip.split(':');
+  let expanded = '';
+  for (const part of parts) {
+    if (part === '') {
+      const missing = 8 - parts.filter(p => p !== '').length;
+      expanded += '0000'.repeat(missing);
+    } else {
+      expanded += part.padStart(4, '0');
+    }
+  }
+  return expanded.split('').reverse().join('.');
 };
 
 export const lookupDkimRecord = async (domain: string, selector: string): Promise<string | null> => {
@@ -243,51 +260,62 @@ const getSpamhausReason = (code: string, dataset: string): string => {
 
   if (dataset === 'ZEN') {
     switch (last) {
+      case '1': return 'Error: Unauthorized DQS Key';
       case '2': return 'SBL - Spamhaus Block List';
-      case '3': return 'SBL-CSS - Spamhaus CSS';
-      case '4': return 'XBL - Exploits Block List';
-      case '9': return 'SBL-DROP - Spamhaus DROP';
-      case '10': return 'PBL - Policy Block List (ISP)';
-      case '11': return 'PBL - Policy Block List (Spamhaus)';
-      case '20': return 'AuthBL - Compromised Auth';
+      case '3': return 'SBL-CSS - Spamhaus CSS (Spam Source)';
+      case '4': 
+      case '5': 
+      case '6': 
+      case '7': return 'XBL - Exploits Block List (Malware/Botnet)';
+      case '9': return 'SBL-DROP - Spamhaus DROP (Hijacked Space)';
+      case '10': return 'PBL - Policy Block List (ISP Dynamics)';
+      case '11': return 'PBL - Policy Block List (Non-MTA Space)';
+      case '20': return 'AuthBL - Compromised Credentials';
       default: return 'Listed (ZEN)';
     }
   } else if (dataset === 'DBL') {
     const codeNum = parseInt(last);
-    if (codeNum === 255) throw new Error('Misleading Query (Invalid DQS usage or domain formatting)');
-    if (codeNum >= 2 && codeNum <= 99) return 'Bad / Low Reputation';
-    if (codeNum >= 102 && codeNum <= 199) return 'Abused but Legitimate';
+    if (codeNum === 255) return 'Error: Invalid DQS Key / Unauthorized';
+    if (codeNum === 2) return 'Bad Domain - Spam Source';
+    if (codeNum === 4) return 'Bad Domain - Phishing';
+    if (codeNum === 5) return 'Bad Domain - Malware';
+    if (codeNum === 6) return 'Bad Domain - Botnet C2';
+    if (codeNum === 102) return 'Abused Legit - Spam';
+    if (codeNum === 103) return 'Abused Legit - Phishing';
+    if (codeNum === 104) return 'Abused Legit - Malware';
+    if (codeNum === 105) return 'Abused Legit - Botnet C2';
+    if (codeNum === 106) return 'Abused Legit - Proxied/Vulnerable';
+    if (codeNum >= 2 && codeNum <= 99) return 'Bad Reputation Domain';
+    if (codeNum >= 102 && codeNum <= 199) return 'Abused but Legitimate Domain';
     return 'Listed (DBL)';
-  } else if (dataset === 'ZRD') {
-    const hours = parseInt(last) - 2;
-    return `Zero Reputation Domain (Observed ${hours}-${hours + 1}h ago)`;
   }
   return 'Listed';
 };
 
 /**
  * Professional Spamhaus DQS Implementation.
- * Uses <target>.<key>.<zone>.dq.spamhaus.net format.
- * Strictly uses Google DNS resolvers via HTTP API.
+ * Accuracy-first DNS resolution matrix.
  */
-export const lookupSpamhausReputation = async (target: string, type: 'ip' | 'domain', dqsKey: string): Promise<SpamhausQueryResult[]> => {
-  if (!dqsKey) throw new Error('DQS Key is missing in environment.');
-
+export const lookupSpamhausReputation = async (target: string, type: 'ip' | 'domain'): Promise<SpamhausQueryResult[]> => {
   const results: SpamhausQueryResult[] = [];
   const zones = type === 'ip' 
     ? [{ name: 'ZEN', host: 'zen.dq.spamhaus.net' }] 
-    : [
-        { name: 'DBL', host: 'dbl.dq.spamhaus.net' },
-        { name: 'ZRD', host: 'zrd.dq.spamhaus.net' }
-      ];
+    : [{ name: 'DBL', host: 'dbl.dq.spamhaus.net' }];
 
   for (const zone of zones) {
     let query = '';
     if (type === 'ip') {
-      const reversedIp = target.split('.').reverse().join('.');
-      query = `${reversedIp}.${dqsKey}.${zone.host}`;
+      if (target.includes(':')) {
+        // IPv6
+        const reversed = reverseIpv6(target);
+        query = `${reversed}.${DQS_INTERNAL_KEY}.${zone.host}`;
+      } else {
+        // IPv4
+        const reversedIp = target.split('.').reverse().join('.');
+        query = `${reversedIp}.${DQS_INTERNAL_KEY}.${zone.host}`;
+      }
     } else {
-      query = `${target}.${dqsKey}.${zone.host}`;
+      query = `${target}.${DQS_INTERNAL_KEY}.${zone.host}`;
     }
 
     const url = `https://dns.google/resolve?name=${query}&type=A`;
@@ -297,10 +325,14 @@ export const lookupSpamhausReputation = async (target: string, type: 'ip' | 'dom
       
       if (data.Status === 0 && data.Answer) {
         const codes = data.Answer.map(ans => ans.data);
+        
+        // Filter out DQS Error codes from "Listed" counts
+        const hasDqsError = codes.some(c => (zone.name === 'ZEN' && c === '127.0.0.1') || (zone.name === 'DBL' && c === '127.0.1.255'));
+        
         results.push({
           dataset: zone.name,
-          listed: true,
-          reason: codes.map(c => getSpamhausReason(c, zone.name)).join(', '),
+          listed: !hasDqsError,
+          reason: hasDqsError ? 'Unauthorized / Invalid DQS Key' : codes.map(c => getSpamhausReason(c, zone.name)).join(', '),
           codes
         });
       } else if (data.Status === 3 || !data.Answer) { // NXDOMAIN
@@ -314,13 +346,12 @@ export const lookupSpamhausReputation = async (target: string, type: 'ip' | 'dom
         results.push({
           dataset: zone.name,
           listed: false,
-          reason: 'Lookup error',
+          reason: 'DNS Lookup failure',
           codes: []
         });
       }
     } catch (e: any) {
-      // Catch "Misleading Query" or other logic errors from getSpamhausReason
-      throw new Error(e.message || 'DNS request failure');
+      throw new Error(e.message || 'DQS infrastructure timeout');
     }
   }
   return results;

@@ -1,4 +1,3 @@
-
 import React, { useState, useMemo } from 'react';
 import { 
   ArrowLeft, 
@@ -6,15 +5,14 @@ import {
   Search, 
   Download, 
   Loader2, 
-  AlertOctagon, 
   ShieldCheck, 
   Zap, 
-  Activity, 
   Terminal, 
   ExternalLink, 
   ChevronRight,
   Info,
   X,
+  ShieldAlert,
   Shield,
   AlertTriangle,
   FileCheck
@@ -47,22 +45,15 @@ const SpamhausTool: React.FC<SpamhausToolProps> = ({ onBack, theme }) => {
   }, [inputLines]);
 
   const handleProcess = async () => {
-    const dqsKey = process.env.SPAMHAUS_DQS_KEY || '';
-    
-    if (!dqsKey) {
-      notify('error', 'SPAMHAUS_DQS_KEY is missing in environment.');
-      return;
-    }
-
     if (uniqueInputs.length === 0) {
-      notify('warning', 'Please provide target IPs or domains.');
+      notify('warning', 'Input required: Please provide bulk IPs or domains.');
       return;
     }
 
     setResults(uniqueInputs.map((u, i) => ({
       id: i + 1,
       input: u,
-      type: /^(\d{1,3}\.){3}\d{1,3}$/.test(u) ? 'ip' : 'domain',
+      type: u.includes(':') || /^(\d{1,3}\.){3}\d{1,3}$/.test(u) ? 'ip' : 'domain',
       listed: false,
       datasets: [],
       reason: '',
@@ -72,20 +63,20 @@ const SpamhausTool: React.FC<SpamhausToolProps> = ({ onBack, theme }) => {
 
     setIsProcessing(true);
     setShowInstructions(false);
-    notify('info', `DQS Matrix initialized for ${uniqueInputs.length} targets.`);
+    notify('info', `Spamhaus Blacklist Audit: Processing ${uniqueInputs.length} targets.`);
 
     for (let i = 0; i < uniqueInputs.length; i++) {
       const target = uniqueInputs[i];
-      const type = /^(\d{1,3}\.){3}\d{1,3}$/.test(target) ? 'ip' : 'domain';
+      const type = target.includes(':') || /^(\d{1,3}\.){3}\d{1,3}$/.test(target) ? 'ip' : 'domain';
       
       setResults(prev => prev.map(r => r.input === target ? { ...r, status: 'loading' } : r));
 
       try {
-        const reputation = await lookupSpamhausReputation(target, type, dqsKey);
+        const reputation = await lookupSpamhausReputation(target, type);
         
         const isListed = reputation.some(rep => rep.listed);
         const listedDatasets = reputation.filter(rep => rep.listed).map(rep => rep.dataset);
-        const reasons = reputation.filter(rep => rep.listed).map(rep => rep.reason);
+        const reasons = reputation.filter(rep => rep.listed || rep.reason.includes('Unauthorized')).map(rep => rep.reason);
         const allCodes = reputation.flatMap(rep => rep.codes);
 
         let status: SpamhausResult['status'] = 'clean';
@@ -93,7 +84,8 @@ const SpamhausTool: React.FC<SpamhausToolProps> = ({ onBack, theme }) => {
           const isHighRisk = reputation.some(rep => 
             rep.codes.some(c => {
                const last = c.split('.').pop() || '';
-               return ['2','3','4','9','255'].includes(last);
+               // ZEN codes 2-9 are high risk (SBL, XBL, DROP). DBL codes 2-9 are high risk.
+               return ['2','3','4','5','6','7','9'].includes(last);
             })
           );
           status = isHighRisk ? 'listed-high' : 'listed-low';
@@ -102,23 +94,23 @@ const SpamhausTool: React.FC<SpamhausToolProps> = ({ onBack, theme }) => {
         setResults(prev => prev.map(r => r.input === target ? {
           ...r,
           listed: isListed,
-          datasets: isListed ? listedDatasets : ['None'],
-          reason: isListed ? reasons.join('; ') : 'NOT LISTED',
+          datasets: isListed ? listedDatasets : (reasons.some(r => r.includes('Unauthorized')) ? ['Error'] : ['None']),
+          reason: reasons.length > 0 ? (isListed ? reasons.join('; ') : reasons[0]) : 'NOT LISTED',
           codes: allCodes,
-          status
+          status: reasons.some(r => r.includes('Unauthorized')) ? 'error' : status
         } : r));
       } catch (err: any) {
         setResults(prev => prev.map(r => r.input === target ? { 
           ...r, 
           status: 'error', 
           listed: false,
-          reason: err.message || 'Lookup failure' 
+          reason: err.message || 'DQS Resolve failure' 
         } : r));
       }
     }
 
     setIsProcessing(false);
-    notify('success', 'Blacklist audit finished.');
+    notify('success', 'Bulk check completed.');
   };
 
   const filteredResults = useMemo(() => {
@@ -143,11 +135,11 @@ const SpamhausTool: React.FC<SpamhausToolProps> = ({ onBack, theme }) => {
           </button>
           <div className="flex items-center gap-3">
             <div className="bg-rose-600 p-2.5 rounded-2xl text-white shadow-xl shadow-rose-600/20">
-              <Shield size={28} />
+              <ShieldAlert size={28} />
             </div>
             <div>
-              <h1 className="text-xl md:text-2xl font-black tracking-tight uppercase">Spamhaus DQS Audit</h1>
-              <p className="text-slate-500 text-[10px] font-black uppercase tracking-widest opacity-60">High-Fidelity reputation system</p>
+              <h1 className="text-xl md:text-2xl font-black tracking-tight uppercase">Spamhaus Blacklist Engine</h1>
+              <p className="text-slate-500 text-[10px] font-black uppercase tracking-widest opacity-60">Professional DQS Security Matrix</p>
             </div>
           </div>
         </div>
@@ -156,7 +148,7 @@ const SpamhausTool: React.FC<SpamhausToolProps> = ({ onBack, theme }) => {
             onClick={() => setShowInstructions(!showInstructions)}
             className={`flex items-center gap-2 px-4 py-2 rounded-2xl transition-all font-bold text-xs border uppercase tracking-widest ${isDark ? 'bg-slate-800 border-slate-700 text-slate-400 hover:text-white' : 'bg-slate-100 border-slate-200 text-slate-600 hover:bg-slate-50'}`}
           >
-            <Info size={16} /> <span className="hidden sm:inline">How to use</span>
+            <Info size={16} /> <span className="hidden sm:inline">User Guide</span>
           </button>
         </div>
       </header>
@@ -166,7 +158,7 @@ const SpamhausTool: React.FC<SpamhausToolProps> = ({ onBack, theme }) => {
         <section className={`p-8 rounded-3xl border animate-in slide-in-from-top-4 duration-300 ${cardClasses}`}>
           <div className="flex justify-between items-start mb-6">
              <h2 className="text-lg font-black uppercase tracking-tight flex items-center gap-2">
-               <ShieldCheck className="text-rose-500" /> Operational Protocol
+               <ShieldCheck className="text-rose-500" /> Professional Documentation
              </h2>
              <button onClick={() => setShowInstructions(false)} className="text-slate-500 hover:text-white">
                 <X size={20} />
@@ -178,45 +170,45 @@ const SpamhausTool: React.FC<SpamhausToolProps> = ({ onBack, theme }) => {
                   <ChevronRight size={12} className="text-rose-500"/> Methodology
                 </p>
                 <ol className="list-decimal list-inside space-y-2 text-slate-400 font-medium">
-                  <li>Paste bulk IPv4 or Domain identifiers (max 1000).</li>
-                  <li>Identifiers are detected automatically.</li>
-                  <li>Direct DNS query using Datafeed Query Service (DQS).</li>
-                  <li>Return codes interpreted via Spamhaus standards.</li>
+                  <li>Input bulk IPv4, IPv6, or Domain identifiers.</li>
+                  <li>System detects and reverses IP octets for DQS format.</li>
+                  <li>Direct A-record query against Spamhaus Professional Zones.</li>
+                  <li>Interpret return codes based on RFC/Spamhaus standards.</li>
                 </ol>
              </div>
              <div className="space-y-4">
                 <p className="font-black text-slate-400 uppercase text-[10px] tracking-widest flex items-center gap-2">
-                  <ChevronRight size={12} className="text-rose-500"/> Dataset Definition
+                  <ChevronRight size={12} className="text-rose-500"/> Return Code Glossary
                 </p>
                 <ul className="space-y-2 text-slate-400 font-medium">
-                  <li><strong className="text-rose-400">ZEN</strong>: Combined SBL+XBL+PBL IP reputation.</li>
-                  <li><strong className="text-rose-400">DBL</strong>: Domain reputation (malware/spam/botnet).</li>
-                  <li><strong className="text-rose-400">ZRD</strong>: Zero-day reputation for new domains.</li>
+                  <li><strong className="text-rose-400">127.0.0.x</strong>: ZEN (IP Reputation). .2:SBL, .4:XBL, .10:PBL.</li>
+                  <li><strong className="text-rose-400">127.0.1.x</strong>: DBL (Domain Reputation). .2:Spam, .4:Phish, .5:Malware.</li>
+                  <li><strong className="text-amber-400">Low Reputation</strong>: New domains or abused legitimate infrastructure.</li>
                 </ul>
              </div>
           </div>
         </section>
       )}
 
-      {/* Input Area */}
+      {/* Input Matrix */}
       <div className="grid grid-cols-1 gap-6">
         <div className={`p-6 rounded-3xl shadow-xl border flex flex-col gap-4 ${cardClasses}`}>
           <div className="flex items-center justify-between">
             <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest flex items-center gap-2">
-               <Terminal size={12} className="text-rose-500" /> Target Matrix (IPs/Domains)
+               <Terminal size={12} className="text-rose-500" /> Forensic Target List (IPs/Domains)
             </label>
-            <span className="text-[10px] font-black text-slate-600 italic">Supports up to 1000 unique entries</span>
+            <span className="text-[10px] font-black text-slate-600 italic">DQS throughput: Up to 1,000 entries</span>
           </div>
           <textarea
             value={input}
             onChange={(e) => setInput(e.target.value)}
-            placeholder="8.8.8.8&#10;domain-example.com&#10;127.0.0.1"
+            placeholder="8.8.8.8&#10;google.com&#10;2001:4860:4860::8888"
             className={`w-full h-56 p-5 border rounded-2xl outline-none font-mono text-xs resize-none transition-all ${inputClasses}`}
           />
           <div className="flex flex-col sm:flex-row items-center justify-between gap-4 mt-2">
             <div className={`px-5 py-2.5 rounded-2xl border flex items-center gap-3 ${isDark ? 'bg-slate-950 border-slate-800' : 'bg-white border-slate-100'}`}>
                <div className="flex flex-col">
-                  <span className="text-[8px] font-black text-slate-500 uppercase tracking-widest">Entry Count</span>
+                  <span className="text-[8px] font-black text-slate-500 uppercase tracking-widest">Identifiers Detected</span>
                   <span className="text-lg font-black text-rose-500 leading-none">{uniqueInputs.length}</span>
                </div>
             </div>
@@ -225,7 +217,7 @@ const SpamhausTool: React.FC<SpamhausToolProps> = ({ onBack, theme }) => {
               disabled={isProcessing || uniqueInputs.length === 0}
               className="w-full sm:w-auto px-12 py-4 bg-rose-600 hover:bg-rose-500 text-white rounded-2xl font-black uppercase tracking-widest text-[10px] shadow-2xl shadow-rose-600/20 disabled:opacity-50 flex items-center justify-center gap-3 transition-all"
             >
-              {isProcessing ? <><Loader2 size={16} className="animate-spin" /> Auditing DQS Matrix...</> : <><Zap size={16} /> Run DQS Audit</>}
+              {isProcessing ? <><Loader2 size={16} className="animate-spin" /> Querying Spamhaus Nodes...</> : <><Zap size={16} /> Run Forensic Blacklist Audit</>}
             </button>
           </div>
         </div>
@@ -239,7 +231,7 @@ const SpamhausTool: React.FC<SpamhausToolProps> = ({ onBack, theme }) => {
               <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-500" size={14} />
               <input
                 type="text"
-                placeholder="Search matrix results..."
+                placeholder="Search blacklist results..."
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
                 className={`w-full pl-10 pr-4 py-2.5 border rounded-xl outline-none text-xs font-bold transition-all ${inputClasses}`}
@@ -248,21 +240,21 @@ const SpamhausTool: React.FC<SpamhausToolProps> = ({ onBack, theme }) => {
             <div className="flex gap-2">
                <button 
                 onClick={() => {
-                  const csv = [['Target', 'Listed', 'Datasets', 'Reputation', 'Codes'].join(','), ...results.map(r => [r.input, r.listed ? 'Yes' : 'No', r.datasets.join(';'), r.reason, r.codes.join(';')].join(','))].join('\n');
+                  const csv = [['Sl No', 'Target Identifier', 'Listed', 'Dataset(s)', 'Reason', 'Return Codes'].join(','), ...results.map(r => [r.id, r.input, r.listed ? 'YES' : 'NO', r.datasets.join(';'), r.reason, r.codes.join(';')].join(','))].join('\n');
                   const blob = new Blob([csv], { type: 'text/csv' });
                   const url = window.URL.createObjectURL(blob);
                   const a = document.createElement('a');
                   a.setAttribute('href', url);
-                  a.setAttribute('download', `dqs_audit_${Date.now()}.csv`);
+                  a.setAttribute('download', `spamhaus_blacklist_${Date.now()}.csv`);
                   document.body.appendChild(a);
                   a.click();
                   document.body.removeChild(a);
                 }}
                 className={`flex items-center gap-2 px-6 py-2.5 rounded-xl border font-black text-[10px] uppercase tracking-widest transition-all ${isDark ? 'bg-slate-800 border-slate-700 text-slate-300 hover:bg-slate-700' : 'bg-white border-slate-200 text-slate-600 hover:bg-slate-50'}`}
               >
-                <Download size={14} /> Export CSV
+                <Download size={14} /> CSV Export
               </button>
-              <button onClick={() => { setResults([]); notify('info', 'Matrix cleared.'); }} className="p-2.5 bg-rose-500/10 text-rose-400 hover:bg-rose-500/20 rounded-2xl text-sm font-bold transition-all border border-rose-500/20">
+              <button onClick={() => { setResults([]); notify('info', 'Matrix reset.'); }} className="p-2.5 bg-rose-500/10 text-rose-400 hover:bg-rose-500/20 rounded-2xl text-sm font-bold transition-all border border-rose-500/20">
                 <Trash2 size={20} />
               </button>
             </div>
@@ -272,12 +264,12 @@ const SpamhausTool: React.FC<SpamhausToolProps> = ({ onBack, theme }) => {
             <table className="w-full text-left">
               <thead>
                 <tr className={`${isDark ? 'bg-[#05080f] border-[#1e293b]' : 'bg-slate-100 border-slate-200'} border-b text-[10px] font-black uppercase tracking-[0.2em] text-slate-500`}>
-                  <th className="px-6 py-4 w-16 text-center">ID</th>
-                  <th className="px-6 py-4">TARGET IDENTIFIER</th>
-                  <th className="px-6 py-4 text-center">LISTED</th>
-                  <th className="px-6 py-4">DATASET(S)</th>
-                  <th className="px-6 py-4">REPUTATION INTERPRETATION</th>
-                  <th className="px-6 py-4 text-center">DQS CODE</th>
+                  <th className="px-6 py-4 w-16 text-center">Sl No</th>
+                  <th className="px-6 py-4">IP / Domain Identifier</th>
+                  <th className="px-6 py-4 text-center">Listed</th>
+                  <th className="px-6 py-4">Dataset(s)</th>
+                  <th className="px-6 py-4">Reason / Reputation</th>
+                  <th className="px-6 py-4 text-center">Return Code(s)</th>
                 </tr>
               </thead>
               <tbody className={`divide-y ${isDark ? 'divide-[#1e293b]' : 'divide-slate-100'}`}>
@@ -287,7 +279,7 @@ const SpamhausTool: React.FC<SpamhausToolProps> = ({ onBack, theme }) => {
                     <td className="px-6 py-4">
                       <div className="flex flex-col">
                          <span className={`text-sm font-black tracking-tight ${isDark ? 'text-slate-100' : 'text-slate-900'}`}>{r.input}</span>
-                         <span className="text-[8px] text-slate-500 font-black uppercase tracking-[0.2em] mt-0.5">{r.type} AUDIT</span>
+                         <span className="text-[8px] text-slate-500 font-black uppercase tracking-[0.2em] mt-0.5">{r.type} Audit</span>
                       </div>
                     </td>
                     <td className="px-6 py-4 text-center">
@@ -320,9 +312,9 @@ const SpamhausTool: React.FC<SpamhausToolProps> = ({ onBack, theme }) => {
 
       {/* Footer Branding */}
       <footer className={`mt-auto pt-10 border-t flex flex-col sm:flex-row justify-between items-center gap-6 text-[10px] font-black text-slate-600 uppercase tracking-widest ${isDark ? 'border-slate-800' : 'border-slate-200'}`}>
-        <p>© {new Date().getFullYear()} Authenticator Pro Lab • DQS Service v5.0.0</p>
+        <p>© {new Date().getFullYear()} Authenticator Pro Lab • Spamhaus Intelligence v6.1.0</p>
         <div className="flex gap-6">
-          <a href="https://www.spamhaus.org/lookup/" target="_blank" className="hover:text-rose-400 flex items-center gap-1">Manual Lookup <ExternalLink size={10}/></a>
+          <a href="https://www.spamhaus.org/lookup/" target="_blank" className="hover:text-rose-400 flex items-center gap-1">Spamhaus.org <ExternalLink size={10}/></a>
         </div>
       </footer>
     </div>
@@ -341,10 +333,10 @@ const StatusBadge: React.FC<{ status: SpamhausResult['status']; listed: boolean 
   const labels = {
     clean: 'NO',
     'listed-high': 'YES (High)',
-    'listed-low': 'YES (New)',
+    'listed-low': 'YES (Low)',
     loading: 'QUERY',
-    error: 'ERROR',
-    pending: 'QUEUE'
+    error: 'INVALID KEY',
+    pending: 'WAIT'
   };
   return (
     <span className={`px-2 py-0.5 rounded text-[8px] font-black uppercase tracking-widest border ${styles[status]}`}>

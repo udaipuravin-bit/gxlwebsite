@@ -207,7 +207,9 @@ export interface SpamhausResult {
   status: 'clean' | 'listed-high' | 'listed-low' | 'pending' | 'loading' | 'error';
 }
 
-// Added RecordMatchResult interface to resolve compilation errors in RecordValidatorTool and RecordMatcherTool.
+// Fixed missing EmailMasterAction and RecordMatchResult types
+export type EmailMasterAction = 'optimize' | 'fix' | 'decode' | 'validate' | 'write';
+
 export interface RecordMatchResult {
   id: number;
   domain: string;
@@ -216,9 +218,3 @@ export interface RecordMatchResult {
   found: string;
   status: 'pending' | 'loading' | 'match' | 'mismatch' | 'missing' | 'error';
 }
-
-// Fixed missing EmailMasterAction export
-/**
- * Action types supported by the Email Master tool for AI processing.
- */
-export type EmailMasterAction = 'optimize' | 'fix' | 'decode' | 'validate' | 'write';
