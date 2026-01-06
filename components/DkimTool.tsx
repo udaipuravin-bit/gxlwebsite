@@ -8,13 +8,9 @@ import {
   ArrowLeft,
   Copy,
   Check,
-  CheckCircle2,
-  AlertCircle,
   Globe,
   Layers,
   Activity,
-  Info,
-  Settings2,
   Zap
 } from 'lucide-react';
 import { DkimResult } from '../types';
@@ -56,7 +52,7 @@ const DkimTool: React.FC<DkimToolProps> = ({ onBack, theme }) => {
     const hasPairs = rawDomains.some(d => d.includes(':'));
 
     if (hasPairs) {
-      notify('info', 'Pair Mode detected (domain:selector).');
+      notify('info', 'Pair Mode enabled (domain:selector).');
       rawDomains.forEach(line => {
         if (line.includes(':')) {
           const [domain, selector] = line.split(':').map(s => s.trim());
@@ -64,7 +60,6 @@ const DkimTool: React.FC<DkimToolProps> = ({ onBack, theme }) => {
             initialResults.push({ id: counter++, domain: domain.toLowerCase(), selector, record: '', status: 'pending' });
           }
         } else {
-          // If a line doesn't have a colon, use the first selector from the selector input if available
           const defaultSelector = rawSelectors[0] || 'default';
           initialResults.push({ id: counter++, domain: line.toLowerCase(), selector: defaultSelector, record: '', status: 'pending' });
         }
@@ -102,7 +97,7 @@ const DkimTool: React.FC<DkimToolProps> = ({ onBack, theme }) => {
     
     setIsProcessing(false);
     const validCount = initialResults.filter(r => r.status === 'success').length;
-    notify(validCount > 0 ? 'success' : 'info', `Audit finished. ${validCount} valid records found.`);
+    notify(validCount > 0 ? 'success' : 'info', `Audit finished. Found ${validCount} records.`);
   };
 
   const stats = useMemo(() => {
@@ -145,10 +140,6 @@ const DkimTool: React.FC<DkimToolProps> = ({ onBack, theme }) => {
         </div>
         {results.length > 0 && (
           <div className="flex items-center gap-4">
-            <div className="hidden md:flex flex-col items-end">
-               <span className="text-[9px] font-black text-slate-500 uppercase tracking-widest">Audit Progress</span>
-               <span className="text-xs font-black text-indigo-500">{stats.progress}%</span>
-            </div>
             <button onClick={() => { setResults([]); notify('info', 'Matrix cleared.'); }} className="p-2.5 bg-rose-500/10 text-rose-400 hover:bg-rose-500/20 rounded-2xl text-sm font-bold transition-all border border-rose-500/20">
               <Trash2 size={18} />
             </button>
@@ -256,16 +247,6 @@ const DkimTool: React.FC<DkimToolProps> = ({ onBack, theme }) => {
                     </td>
                   </tr>
                 ))}
-                {filteredResults.length === 0 && (
-                  <tr>
-                    <td colSpan={4} className="px-6 py-20 text-center">
-                       <div className="flex flex-col items-center gap-3 opacity-30">
-                          <Activity size={40} />
-                          <p className="text-[10px] font-black uppercase tracking-[0.2em]">No matches found in matrix</p>
-                       </div>
-                    </td>
-                  </tr>
-                )}
               </tbody>
             </table>
           </div>

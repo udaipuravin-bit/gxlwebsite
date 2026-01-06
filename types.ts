@@ -209,3 +209,13 @@ export interface SpamhausResult {
   codes: string[];
   status: 'clean' | 'listed-high' | 'listed-low' | 'pending' | 'loading' | 'error';
 }
+
+// Fix: Added missing RecordValidatorResult interface to resolve compilation error in RecordValidatorTool.tsx
+export interface RecordValidatorResult {
+  id: number;
+  domain: string;
+  hostname: string;
+  expected: string;
+  found: string;
+  status: 'pending' | 'loading' | 'match' | 'mismatch' | 'missing' | 'error';
+}

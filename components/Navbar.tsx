@@ -43,7 +43,7 @@ const Navbar: React.FC<NavbarProps> = ({ onNavigate, theme, onToggleTheme }) => 
       { id: 'dkim-checker', name: 'Bulk DKIM', icon: <ShieldCheck size={16} />, color: 'text-emerald-400' },
       { id: 'spf-validator', name: 'SPF Validator', icon: <Globe size={16} />, color: 'text-amber-400' },
       { id: 'dmarc-checker', name: 'DMARC Audit', icon: <BarChart3 size={16} />, color: 'text-sky-400' },
-      { id: 'spamhaus-checker', name: 'Spamhaus DQS', icon: <AlertOctagon size={16} />, color: 'text-rose-500' },
+      { id: 'spamhaus-checker', name: 'Spamhaus Blacklist', icon: <AlertOctagon size={16} />, color: 'text-rose-500' },
       { id: 'caa-checker', name: 'CAA Policy', icon: <FileCheck size={16} />, color: 'text-teal-400' },
     ],
     infrastructure: [
@@ -75,7 +75,6 @@ const Navbar: React.FC<NavbarProps> = ({ onNavigate, theme, onToggleTheme }) => 
     setIsSearchFocused(false);
   };
 
-  // Close search results when clicking outside
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
       if (searchRef.current && !searchRef.current.contains(event.target as Node)) {
@@ -92,7 +91,6 @@ const Navbar: React.FC<NavbarProps> = ({ onNavigate, theme, onToggleTheme }) => 
     <nav className={`sticky top-0 z-50 border-b transition-colors duration-300 ${isDark ? 'bg-slate-900/80 border-slate-800 backdrop-blur-xl' : 'bg-white/90 border-slate-200 backdrop-blur-md'}`}>
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="flex justify-between h-16 items-center gap-4">
-          {/* Logo */}
           <button 
             onClick={() => handleNavigate('home')} 
             className="flex items-center gap-2 group shrink-0"
@@ -105,11 +103,11 @@ const Navbar: React.FC<NavbarProps> = ({ onNavigate, theme, onToggleTheme }) => 
             </span>
           </button>
 
-          {/* Desktop Nav */}
           <div className="hidden lg:flex items-center gap-1 ml-4 flex-1">
-            <NavButton onClick={() => handleNavigate('dkim-checker')} label="DKIM" active={false} theme={theme} />
-            <NavButton onClick={() => handleNavigate('spf-validator')} label="SPF" active={false} theme={theme} />
-            <NavButton onClick={() => handleNavigate('dmarc-checker')} label="DMARC" active={false} theme={theme} />
+            <NavButton onClick={() => handleNavigate('dkim-checker')} label="DKIM" theme={theme} />
+            <NavButton onClick={() => handleNavigate('spf-validator')} label="SPF" theme={theme} />
+            <NavButton onClick={() => handleNavigate('dmarc-checker')} label="DMARC" theme={theme} />
+            <NavButton onClick={() => handleNavigate('spamhaus-checker')} label="Spamhaus" theme={theme} />
             
             <div 
               className="relative"
@@ -120,7 +118,6 @@ const Navbar: React.FC<NavbarProps> = ({ onNavigate, theme, onToggleTheme }) => 
                 ALL TOOLS <ChevronDown size={14} className={`transition-transform duration-200 ${isAllToolsOpen ? 'rotate-180' : ''}`} />
               </button>
 
-              {/* Mega Menu Dropdown */}
               {isAllToolsOpen && (
                 <div className={`absolute top-full left-1/2 -translate-x-1/2 w-[800px] shadow-2xl rounded-2xl border p-8 grid grid-cols-3 gap-8 animate-in fade-in slide-in-from-top-2 duration-200 ${isDark ? 'bg-slate-900 border-slate-800' : 'bg-white border-slate-200'}`}>
                   <div>
@@ -152,9 +149,7 @@ const Navbar: React.FC<NavbarProps> = ({ onNavigate, theme, onToggleTheme }) => 
             </div>
           </div>
 
-          {/* Right Actions: Search + Theme + Mobile Menu */}
           <div className="flex items-center gap-2 md:gap-4 flex-1 justify-end">
-            {/* Search Input */}
             <div className="relative w-full max-w-[120px] md:max-w-[240px]" ref={searchRef}>
               <div className={`flex items-center gap-2 px-3 py-1.5 rounded-xl border transition-all ${
                 isDark 
@@ -172,7 +167,6 @@ const Navbar: React.FC<NavbarProps> = ({ onNavigate, theme, onToggleTheme }) => 
                 />
               </div>
 
-              {/* Search Results Dropdown */}
               {isSearchFocused && filteredTools.length > 0 && (
                 <div className={`absolute top-full mt-2 w-full max-w-[280px] right-0 shadow-2xl rounded-2xl border p-2 animate-in fade-in slide-in-from-top-1 duration-200 overflow-hidden ${
                   isDark ? 'bg-slate-900 border-slate-800' : 'bg-white border-slate-200'
@@ -210,7 +204,6 @@ const Navbar: React.FC<NavbarProps> = ({ onNavigate, theme, onToggleTheme }) => 
               {isDark ? <Sun size={18} /> : <Moon size={18} />}
             </button>
 
-            {/* Mobile Toggle */}
             <button 
               className={`lg:hidden p-2 rounded-lg shrink-0 ${isDark ? 'text-slate-400' : 'text-slate-600'}`}
               onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
@@ -220,50 +213,22 @@ const Navbar: React.FC<NavbarProps> = ({ onNavigate, theme, onToggleTheme }) => 
           </div>
         </div>
       </div>
-
-      {/* Mobile Menu */}
-      {isMobileMenuOpen && (
-        <div className={`lg:hidden p-4 space-y-4 shadow-xl border-t ${isDark ? 'bg-slate-900 border-slate-800' : 'bg-white border-slate-100'}`}>
-          <div className="grid grid-cols-1 gap-2">
-             {Object.values(tools).flat().slice(0, 4).map(t => (
-               <button key={t.id} onClick={() => handleNavigate(t.id)} className={`flex items-center gap-3 p-3 rounded-xl font-bold text-sm ${isDark ? 'text-slate-300 hover:bg-slate-800' : 'text-slate-600 hover:bg-slate-100'}`}>
-                 <span className={isDark ? t.color : 'text-indigo-600'}>{t.icon}</span> {t.name}
-               </button>
-             ))}
-             <hr className={isDark ? 'border-slate-800' : 'border-slate-100'} />
-             <p className="text-[10px] font-black text-slate-500 uppercase tracking-widest px-3">All Intelligence Tools</p>
-             <div className="grid grid-cols-2 gap-2">
-                {Object.values(tools).flat().slice(4).map(t => (
-                  <button key={t.id} onClick={() => handleNavigate(t.id)} className={`flex items-center gap-2 p-2 rounded-lg text-xs font-bold ${isDark ? 'text-slate-400 hover:bg-slate-800' : 'text-slate-50 hover:bg-slate-100'}`}>
-                    {t.name}
-                  </button>
-                ))}
-             </div>
-          </div>
-        </div>
-      )}
     </nav>
   );
 };
 
-const NavButton: React.FC<{ onClick: () => void; label: string; active: boolean; theme: string }> = ({ onClick, label, active, theme }) => (
-  <button 
-    onClick={onClick}
-    className={`px-4 py-2 rounded-lg text-sm font-bold transition-all ${theme === 'dark' ? 'text-slate-400 hover:text-white hover:bg-slate-800' : 'text-slate-600 hover:text-indigo-600 hover:bg-slate-100'}`}
-  >
+const NavButton: React.FC<{ onClick: () => void; label: string; theme: string }> = ({ onClick, label, theme }) => (
+  <button onClick={onClick} className={`px-4 py-2 rounded-lg text-sm font-bold transition-all ${theme === 'dark' ? 'text-slate-400 hover:text-white hover:bg-slate-800' : 'text-slate-600 hover:text-indigo-600 hover:bg-slate-100'}`}>
     {label}
   </button>
 );
 
 const MegaMenuButton: React.FC<{ icon: React.ReactNode; label: string; onClick: () => void; theme: string; colorClass: string }> = ({ icon, label, onClick, theme, colorClass }) => (
-  <button 
-    onClick={onClick}
-    className={`w-full flex items-center gap-3 p-3 rounded-xl group transition-all text-left ${theme === 'dark' ? 'hover:bg-slate-800' : 'hover:bg-slate-50'}`}
-  >
-    <div className={`transition-colors ${theme === 'dark' ? colorClass : 'text-slate-400 group-hover:text-indigo-600'}`}>
-      {icon}
+  <button onClick={onClick} className={`w-full flex items-center gap-3 p-2 rounded-xl transition-all group ${theme === 'dark' ? 'hover:bg-slate-800' : 'hover:bg-slate-50'}`}>
+    <div className={`p-2 rounded-lg transition-transform group-hover:scale-110 ${theme === 'dark' ? 'bg-slate-950' : 'bg-white shadow-sm border border-slate-100'}`}>
+      <span className={colorClass}>{icon}</span>
     </div>
-    <span className={`text-sm font-bold transition-colors ${theme === 'dark' ? 'text-slate-300 group-hover:text-white' : 'text-slate-600 group-hover:text-slate-900'}`}>
+    <span className={`text-xs font-bold transition-colors ${theme === 'dark' ? 'text-slate-400 group-hover:text-white' : 'text-slate-600 group-hover:text-indigo-600'}`}>
       {label}
     </span>
   </button>

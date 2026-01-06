@@ -1,3 +1,4 @@
+
 import React, { useState, createContext, useContext, useCallback } from 'react';
 import Navbar from './components/Navbar';
 import Home from './components/Home';
@@ -63,10 +64,9 @@ const App: React.FC = () => {
 
   const isDark = theme === 'dark';
 
-  // Navigation helper that also scrolls to top to fix "behind navbar" initial perception
   const navigate = (view: View) => {
     setCurrentView(view);
-    window.scrollTo(0, 0);
+    window.scrollTo({ top: 0, behavior: 'smooth' });
   };
 
   return (
@@ -78,8 +78,7 @@ const App: React.FC = () => {
           onToggleTheme={toggleTheme} 
         />
         
-        {/* Added standard padding-top to ensure tool headers start below the sticky navbar */}
-        <main className="relative z-0">
+        <main className="relative z-0 pt-16">
           {currentView === 'home' && (
             <Home 
               theme={theme}

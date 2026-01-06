@@ -1,3 +1,4 @@
+
 import React from 'react';
 import { 
   ShieldCheck, 
@@ -71,8 +72,8 @@ const Home: React.FC<HomeProps> = (props) => {
             theme={props.theme}
             onClick={props.onLaunchSpamhaus} 
             icon={<AlertOctagon size={32} />} 
-            title="Spamhaus DQS" 
-            desc="Bulk IP & Domain reputation check via Datafeed Query Service." 
+            title="Spamhaus Blacklist" 
+            desc="Bulk IP & Domain reputation check via professional blocklists." 
             colorClass="text-rose-500"
             glowClass="bg-rose-500/10"
           />
@@ -87,21 +88,21 @@ const Home: React.FC<HomeProps> = (props) => {
           />
           <ToolCard 
             theme={props.theme}
+            onClick={props.onLaunchDmarc} 
+            icon={<BarChart3 size={32} />} 
+            title="DMARC Audit" 
+            desc="Analyze and verify DMARC policies for bulk domain lists." 
+            colorClass="text-sky-400"
+            glowClass="bg-sky-500/10"
+          />
+          <ToolCard 
+            theme={props.theme}
             onClick={props.onLaunchSpf} 
             icon={<Globe size={32} />} 
             title="SPF Validator" 
             desc="Audit DNS lookup limits and bulk protocol compliance." 
             colorClass="text-amber-400"
             glowClass="bg-amber-500/10"
-          />
-          <ToolCard 
-            theme={props.theme}
-            onClick={props.onLaunchDmarc} 
-            icon={<BarChart3 size={32} />} 
-            title="DMARC Audit" 
-            desc="Analyze policy alignment and global reporting endpoints." 
-            colorClass="text-sky-400"
-            glowClass="bg-sky-500/10"
           />
         </div>
       </section>
