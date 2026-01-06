@@ -1,3 +1,4 @@
+
 import { DnsResponse, DnsLookupEntry, MxRecord, WhoisResult, PtrResult, CaaRecord } from '../types';
 
 const RECORD_TYPE_MAP: Record<string, number> = {
@@ -231,10 +232,13 @@ export const lookupWhoisData = async (domain: string): Promise<Omit<WhoisResult,
 };
 
 /**
- * Spamhaus DQS Query Implementation
+ * Spamhaus Blacklist Query Implementation
+ * Robust construction to handle both DQS and Public mirrors.
  */
 export const lookupSpamhausReputation = async (input: string, type: 'ip' | 'domain', dqsKey: string): Promise<{ dataset: string; reason: string; codes: string[]; listed: boolean }[]> => {
   const results: { dataset: string; reason: string; codes: string[]; listed: boolean }[] = [];
+  const cleanInput = input.trim().replace(/\.$/, '');
+  const cleanKey = dqsKey.trim();
 
   const dnsQuery = async (hostname: string) => {
     try {
@@ -249,8 +253,11 @@ export const lookupSpamhausReputation = async (input: string, type: 'ip' | 'doma
   };
 
   if (type === 'ip') {
-    const reversedIp = input.split('.').reverse().join('.');
-    const zenHostname = `${reversedIp}.${dqsKey}.zen.dq.spamhaus.net`;
+    const reversedIp = cleanInput.split('.').reverse().join('.');
+    const zenHostname = cleanKey 
+      ? `${reversedIp}.${cleanKey}.zen.dq.spamhaus.net` 
+      : `${reversedIp}.zen.spamhaus.net`;
+      
     const answers = await dnsQuery(zenHostname);
     
     if (answers.length > 0) {
@@ -277,7 +284,10 @@ export const lookupSpamhausReputation = async (input: string, type: 'ip' | 'doma
     }
   } else {
     // DBL Logic
-    const dblHostname = `${input}.${dqsKey}.dbl.dq.spamhaus.net`;
+    const dblHostname = cleanKey 
+      ? `${cleanInput}.${cleanKey}.dbl.dq.spamhaus.net` 
+      : `${cleanInput}.dbl.spamhaus.net`;
+
     const dblAnswers = await dnsQuery(dblHostname);
     if (dblAnswers.length > 0) {
       const codes = dblAnswers.map(a => a.data);
@@ -293,20 +303,22 @@ export const lookupSpamhausReputation = async (input: string, type: 'ip' | 'doma
       results.push({ dataset: 'DBL', reason, codes, listed: true });
     }
 
-    // ZRD Logic
-    const zrdHostname = `${input}.${dqsKey}.zrd.dq.spamhaus.net`;
-    const zrdAnswers = await dnsQuery(zrdHostname);
-    if (zrdAnswers.length > 0) {
-      const codes = zrdAnswers.map(a => a.data);
-      const last = parseInt(codes[0].split('.').pop() || '0');
-      // 127.0.2.2 - 127.0.2.24
-      const hours = last - 2; 
-      results.push({ 
-        dataset: 'ZRD', 
-        reason: `Zero Reputation Domain (first observed ${hours} hours ago)`, 
-        codes, 
-        listed: true 
-      });
+    // ZRD Logic (ZRD is only available via DQS)
+    if (cleanKey) {
+      const zrdHostname = `${cleanInput}.${cleanKey}.zrd.dq.spamhaus.net`;
+      const zrdAnswers = await dnsQuery(zrdHostname);
+      if (zrdAnswers.length > 0) {
+        const codes = zrdAnswers.map(a => a.data);
+        const last = parseInt(codes[0].split('.').pop() || '0');
+        // 127.0.2.2 - 127.0.2.24
+        const hours = last - 2; 
+        results.push({ 
+          dataset: 'ZRD', 
+          reason: `Zero Reputation Domain (first observed ${hours} hours ago)`, 
+          codes, 
+          listed: true 
+        });
+      }
     }
   }
 
