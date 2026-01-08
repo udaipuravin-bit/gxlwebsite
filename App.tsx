@@ -1,3 +1,4 @@
+
 import React, { useState, createContext, useContext, useCallback } from 'react';
 import Navbar from './components/Navbar';
 import Home from './components/Home';
@@ -15,11 +16,17 @@ import MimeEncoderTool from './components/MimeEncoderTool';
 import SubjectEncoderTool from './components/SubjectEncoderTool';
 import EmailMasterTool from './components/EmailMasterTool';
 import SpamhausTool from './components/SpamhausTool';
+import SpamCopTool from './components/SpamCopTool';
+import BarracudaTool from './components/BarracudaTool';
 import UrlTracerTool from './components/UrlTracerTool';
 import HtmlCleanerTool from './components/HtmlCleanerTool';
+import EmailBuilderTool from './components/EmailBuilderTool';
+import GrapesBuilderTool from './components/GrapesBuilderTool';
+import RecordMatcherTool from './components/RecordMatcherTool';
+import BulkBlacklistTool from './components/BulkBlacklistTool';
 import { X, CheckCircle2, AlertCircle, Info, AlertTriangle } from 'lucide-react';
 
-type View = 'home' | 'dkim-checker' | 'dmarc-checker' | 'spf-validator' | 'dns-lookup' | 'mx-lookup' | 'whois-checker' | 'reverse-dns' | 'caa-checker' | 'email-header-analyzer' | 'ip-geolocation' | 'mime-encoder' | 'subject-encoder' | 'email-master' | 'spamhaus-checker' | 'url-tracer' | 'html-cleaner';
+type View = 'home' | 'dkim-checker' | 'dmarc-checker' | 'spf-validator' | 'dns-lookup' | 'mx-lookup' | 'whois-checker' | 'reverse-dns' | 'caa-checker' | 'email-header-analyzer' | 'ip-geolocation' | 'mime-encoder' | 'subject-encoder' | 'email-master' | 'spamhaus-checker' | 'spamcop-checker' | 'barracuda-checker' | 'url-tracer' | 'html-cleaner' | 'email-builder' | 'grapes-builder' | 'record-matcher' | 'bulk-blacklist';
 type Theme = 'dark' | 'light';
 
 export type NotificationType = 'success' | 'error' | 'info' | 'warning';
@@ -70,10 +77,12 @@ const App: React.FC = () => {
     window.scrollTo({ top: 0, behavior: 'smooth' });
   };
 
+  const fullScreenViews: View[] = ['html-cleaner', 'email-master', 'email-builder', 'grapes-builder'];
+
   return (
     <NotificationContext.Provider value={{ notify }}>
       <div className={`min-h-screen transition-colors duration-300 ${isDark ? 'bg-slate-950 text-slate-100' : 'bg-slate-50 text-slate-900'} selection:bg-indigo-500/30`}>
-        {currentView !== 'html-cleaner' && currentView !== 'email-master' && (
+        {!fullScreenViews.includes(currentView) && (
           <Navbar 
             onNavigate={(view) => navigate(view as View)} 
             theme={theme} 
@@ -81,7 +90,7 @@ const App: React.FC = () => {
           />
         )}
         
-        <main className={`relative z-0 ${currentView === 'html-cleaner' || currentView === 'email-master' ? 'pt-0' : 'pt-16'}`}>
+        <main className={`relative z-0 ${fullScreenViews.includes(currentView) ? 'pt-0' : 'pt-16'}`}>
           {currentView === 'home' && (
             <Home 
               theme={theme}
@@ -99,8 +108,14 @@ const App: React.FC = () => {
               onLaunchSubjectEncoder={() => navigate('subject-encoder')}
               onLaunchEmailMaster={() => navigate('email-master')}
               onLaunchSpamhaus={() => navigate('spamhaus-checker')}
+              onLaunchSpamCop={() => navigate('spamcop-checker')}
+              onLaunchBarracuda={() => navigate('barracuda-checker')}
               onLaunchUrlTracer={() => navigate('url-tracer')}
               onLaunchHtmlCleaner={() => navigate('html-cleaner')}
+              onLaunchEmailBuilder={() => navigate('email-builder')}
+              onLaunchGrapesBuilder={() => navigate('grapes-builder')}
+              onLaunchRecordMatcher={() => navigate('record-matcher')}
+              onLaunchBulkBlacklist={() => navigate('bulk-blacklist')}
             />
           )}
           {currentView === 'dkim-checker' && <DkimTool theme={theme} onBack={() => navigate('home')} />}
@@ -117,8 +132,14 @@ const App: React.FC = () => {
           {currentView === 'subject-encoder' && <SubjectEncoderTool theme={theme} onBack={() => navigate('home')} />}
           {currentView === 'email-master' && <EmailMasterTool theme={theme} onBack={() => navigate('home')} />}
           {currentView === 'spamhaus-checker' && <SpamhausTool theme={theme} onBack={() => navigate('home')} />}
+          {currentView === 'spamcop-checker' && <SpamCopTool theme={theme} onBack={() => navigate('home')} />}
+          {currentView === 'barracuda-checker' && <BarracudaTool theme={theme} onBack={() => navigate('home')} />}
           {currentView === 'url-tracer' && <UrlTracerTool theme={theme} onBack={() => navigate('home')} />}
           {currentView === 'html-cleaner' && <HtmlCleanerTool theme={theme} onBack={() => navigate('home')} />}
+          {currentView === 'email-builder' && <EmailBuilderTool theme={theme} onBack={() => navigate('home')} />}
+          {currentView === 'grapes-builder' && <GrapesBuilderTool theme={theme} onBack={() => navigate('home')} />}
+          {currentView === 'record-matcher' && <RecordMatcherTool theme={theme} onBack={() => navigate('home')} />}
+          {currentView === 'bulk-blacklist' && <BulkBlacklistTool theme={theme} onBack={() => navigate('home')} />}
         </main>
 
         <div className="fixed top-6 right-6 z-[10000] flex flex-col gap-3 w-full max-w-sm pointer-events-none">

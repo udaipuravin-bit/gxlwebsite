@@ -62,8 +62,8 @@ const DEFAULT_HTML = `<!DOCTYPE html>
 </head>
 <body>
   <div class="container">
-    <h1>Welcome to Email Master</h1>
-    <p>Premium HTML editor with slim gutter and high-contrast theme.</p>
+    <h1>Welcome to the HTML Editor</h1>
+    <p>Premium HTML editor with live preview.</p>
     <a href="#" class="btn">Get Started</a>
   </div>
 </body>
@@ -149,7 +149,6 @@ const EmailMasterTool: React.FC<EmailMasterToolProps> = ({ onBack, theme: initia
   const triggerFind = () => {
     if (editorRef.current) {
       editorRef.current.focus();
-      // Directly run the find action from Monaco
       editorRef.current.trigger('keyboard', 'actions.find', {});
     }
   };
@@ -191,17 +190,16 @@ const EmailMasterTool: React.FC<EmailMasterToolProps> = ({ onBack, theme: initia
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;
-    a.download = 'email_master_export.html';
+    a.download = 'export.html';
     a.click();
     URL.revokeObjectURL(url);
-    notify('success', 'HTML export initiated.');
+    notify('success', 'HTML export complete.');
   };
 
   const resetEditor = () => {
-    // Replaced confirm with internal logic for cleaner UI, could use a modal but simple for now
     if (code !== DEFAULT_HTML) {
       setCode(DEFAULT_HTML);
-      notify('info', 'Editor reset to default template.');
+      notify('info', 'Editor reset.');
     }
   };
 
@@ -215,27 +213,15 @@ const EmailMasterTool: React.FC<EmailMasterToolProps> = ({ onBack, theme: initia
     minimap: { enabled: false },
     lineNumbers: "on" as const,
     lineNumbersMinChars: 2,
-    lineDecorationsWidth: 0,
-    glyphMargin: false,
-    folding: false,
     wordWrap: "on" as const,
     scrollBeyondLastLine: false,
     automaticLayout: true,
     padding: { top: 10 },
-    smoothScrolling: true,
-    cursorSmoothCaretAnimation: "on" as const,
-    bracketPairColorization: { enabled: true },
-    suggest: { showWords: false, snippetsPreventQuickSuggestions: true },
-    quickSuggestions: false,
     fixedOverflowWidgets: true, 
     renderLineHighlight: "all" as const,
-    hideCursorInOverviewRuler: true,
     scrollbar: {
       vertical: 'visible' as const,
       horizontal: 'visible' as const,
-      useShadows: false,
-      verticalHasArrows: false,
-      horizontalHasArrows: false,
       verticalScrollbarSize: 10,
       horizontalScrollbarSize: 10
     }
@@ -254,15 +240,15 @@ const EmailMasterTool: React.FC<EmailMasterToolProps> = ({ onBack, theme: initia
             <div className="bg-indigo-600 p-1.5 rounded-lg text-white">
               <Code2 size={16} />
             </div>
-            <h1 className="text-sm font-black uppercase tracking-widest hidden sm:block">Email Master</h1>
+            <h1 className="text-sm font-black uppercase tracking-widest hidden sm:block">HTML Editor</h1>
           </div>
           <div className="h-6 w-px bg-slate-800 mx-2 hidden md:block" />
           <div className="flex items-center gap-1">
              <ToolButton onClick={() => setCode(code)} icon={<Play size={14}/>} label="Run" color="emerald" isDark={isDark} />
              <ToolButton onClick={resetEditor} icon={<RotateCcw size={14}/>} label="Reset" isDark={isDark} />
-             <ToolButton onClick={() => { navigator.clipboard.writeText(code); setCopied(true); setTimeout(() => setCopied(false), 2000); notify('success', 'Code copied to clipboard.'); }} icon={copied ? <Check size={14} className="text-emerald-500"/> : <Copy size={14}/>} label={copied ? "Copied" : "Copy"} isDark={isDark} />
+             <ToolButton onClick={() => { navigator.clipboard.writeText(code); setCopied(true); setTimeout(() => setCopied(false), 2000); notify('success', 'Copied.'); }} icon={copied ? <Check size={14} className="text-emerald-500"/> : <Copy size={14}/>} label={copied ? "Copied" : "Copy"} isDark={isDark} />
              <ToolButton onClick={downloadHtml} icon={<Download size={14}/>} label="Export" isDark={isDark} />
-             <ToolButton onClick={triggerFind} icon={<Search size={14}/>} label="Find & Replace" isDark={isDark} />
+             <ToolButton onClick={triggerFind} icon={<Search size={14}/>} label="Find" isDark={isDark} />
           </div>
         </div>
 
@@ -275,9 +261,6 @@ const EmailMasterTool: React.FC<EmailMasterToolProps> = ({ onBack, theme: initia
           <button onClick={toggleTheme} className={`p-2 rounded-lg hover:bg-slate-500/10 transition-colors ${isDark ? 'text-yellow-400' : 'text-slate-600'}`}>
             {isDark ? <Sun size={18} /> : <Moon size={18} />}
           </button>
-          <button onClick={() => { setJsEnabled(!jsEnabled); notify('info', `JS execution ${!jsEnabled ? 'enabled' : 'disabled'} in preview.`); }} className={`p-2 rounded-lg hover:bg-slate-500/10 transition-colors ${jsEnabled ? 'text-emerald-400' : 'text-slate-50'}`}>
-            {jsEnabled ? <Unlock size={18}/> : <Lock size={18}/>}
-          </button>
         </div>
       </header>
 
@@ -287,10 +270,8 @@ const EmailMasterTool: React.FC<EmailMasterToolProps> = ({ onBack, theme: initia
         {/* Editor Pane */}
         <div style={{ width: `${splitPosition}%` }} className="h-full relative flex flex-col bg-[#0f172a] transition-[width] duration-0">
           <div className="h-8 bg-[#1e293b] flex items-center px-4 justify-between border-b border-slate-800 shrink-0 select-none">
-             <span className="text-[10px] font-black uppercase tracking-widest text-slate-500">Source Editor</span>
-             <span className="text-[9px] font-mono text-slate-600">HTML5</span>
+             <span className="text-[10px] font-black uppercase tracking-widest text-slate-500">Editor</span>
           </div>
-          {/* Ensure the editor container itself allows widget overflow and has high z-index stacking */}
           <div className="flex-1 min-h-0 relative z-[10] overflow-visible">
             <Editor
               height="100%"
@@ -318,7 +299,7 @@ const EmailMasterTool: React.FC<EmailMasterToolProps> = ({ onBack, theme: initia
           
           <div className={`h-8 px-4 flex items-center justify-between border-b shrink-0 select-none ${isDark ? 'bg-slate-900 border-slate-800' : 'bg-white border-slate-200'}`}>
              <div className="flex items-center gap-2">
-                <span className="text-[10px] font-black uppercase tracking-widest text-slate-500">Live Preview</span>
+                <span className="text-[10px] font-black uppercase tracking-widest text-slate-500">Preview</span>
              </div>
              <div className="flex items-center gap-1">
                 <PreviewModeButton active={previewMode === 'desktop'} onClick={() => setPreviewMode('desktop')} icon={<Monitor size={12}/>} isDark={isDark} />
@@ -334,7 +315,6 @@ const EmailMasterTool: React.FC<EmailMasterToolProps> = ({ onBack, theme: initia
               }`}>
                {previewMode === 'mobile' && <div className="absolute top-0 left-1/2 -translate-x-1/2 w-24 h-5 bg-slate-900 rounded-b-xl z-10" />}
                <iframe srcDoc={srcDoc} className="w-full h-full border-none bg-white rounded-inherit" title="Preview" sandbox="allow-scripts allow-popups allow-forms" />
-               {previewMode === 'mobile' && <div className="absolute bottom-1 left-1/2 -translate-x-1/2 w-10 h-1 bg-slate-700 rounded-full" />}
              </div>
           </div>
         </div>
@@ -342,11 +322,7 @@ const EmailMasterTool: React.FC<EmailMasterToolProps> = ({ onBack, theme: initia
 
       <footer className={`shrink-0 h-6 px-4 flex items-center justify-between text-[9px] font-black uppercase tracking-widest border-t z-[100] select-none ${toolbarClasses}`}>
         <div className="flex gap-4">
-           <span>Bytes: {new Blob([code]).size}</span>
-           <span>Device: {previewMode}</span>
-        </div>
-        <div className="flex gap-2">
-           <span className="text-indigo-500 text-[8px] tracking-tighter">AUTHENTICATOR PRO LAB • v3.0.4</span>
+           <span>Size: {new Blob([code]).size} bytes</span>
         </div>
       </footer>
     </div>

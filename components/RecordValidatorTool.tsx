@@ -55,7 +55,8 @@ const RecordValidatorTool: React.FC<RecordValidatorToolProps> = ({ onBack, theme
       return;
     }
 
-    const domainList = Array.from(new Set(
+    // Fix: Explicitly type domainList and use Set<string> to prevent 'unknown' type inference
+    const domainList: string[] = Array.from(new Set<string>(
       domainsInput.split(/[\n,]/).map(d => d.trim().toLowerCase()).filter(d => d.length > 0)
     ));
 

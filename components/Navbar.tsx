@@ -21,10 +21,15 @@ import {
   Type,
   Search as SearchIcon,
   FileCode2,
-  AlertOctagon,
   ShieldAlert,
   Link2,
-  Scissors
+  Scissors,
+  Layout,
+  Box,
+  Layers,
+  SearchCheck,
+  Fish,
+  Grid
 } from 'lucide-react';
 
 interface NavbarProps {
@@ -42,33 +47,39 @@ const Navbar: React.FC<NavbarProps> = ({ onNavigate, theme, onToggleTheme }) => 
 
   const tools = {
     authentication: [
-      { id: 'dkim-checker', name: 'Bulk DKIM', icon: <ShieldCheck size={16} />, color: 'text-emerald-400' },
-      { id: 'spf-validator', name: 'SPF Validator', icon: <Globe size={16} />, color: 'text-amber-400' },
-      { id: 'dmarc-checker', name: 'DMARC Audit', icon: <BarChart3 size={16} />, color: 'text-sky-400' },
-      { id: 'spamhaus-checker', name: 'Spamhaus Blacklist', icon: <ShieldAlert size={16} />, color: 'text-rose-500' },
-      { id: 'caa-checker', name: 'CAA Policy', icon: <FileCheck size={16} />, color: 'text-teal-400' },
+      { id: 'bulk-blacklist', name: 'Blacklist Checker', icon: <Grid size={16} />, color: 'text-indigo-500' },
+      { id: 'spamhaus-checker', name: 'Spamhaus Checker', icon: <ShieldAlert size={16} />, color: 'text-rose-500' },
+      { id: 'barracuda-checker', name: 'Barracuda Checker', icon: <Fish size={16} />, color: 'text-blue-500' },
+      { id: 'spamcop-checker', name: 'SpamCop Checker', icon: <SearchCheck size={16} />, color: 'text-orange-500' },
+      { id: 'dkim-checker', name: 'DKIM Checker', icon: <ShieldCheck size={16} />, color: 'text-emerald-400' },
+      { id: 'spf-validator', name: 'SPF Checker', icon: <Globe size={16} />, color: 'text-amber-400' },
+      { id: 'dmarc-checker', name: 'DMARC Checker', icon: <BarChart3 size={16} />, color: 'text-sky-400' },
+      { id: 'record-matcher', name: 'Record Matcher', icon: <Layers size={16} />, color: 'text-indigo-400' },
+      { id: 'caa-checker', name: 'CAA Checker', icon: <FileCheck size={16} />, color: 'text-teal-400' },
     ],
     infrastructure: [
       { id: 'url-tracer', name: 'URL Tracer', icon: <Link2 size={16} />, color: 'text-indigo-400' },
-      { id: 'mx-lookup', name: 'MX & Providers', icon: <Mail size={16} />, color: 'text-rose-400' },
-      { id: 'dns-lookup', name: 'Deep DNS', icon: <SearchCode size={16} />, color: 'text-indigo-400' },
-      { id: 'reverse-dns', name: 'Reverse DNS', icon: <Hash size={16} />, color: 'text-violet-400' },
+      { id: 'mx-lookup', name: 'MX Checker', icon: <Mail size={16} />, color: 'text-rose-400' },
+      { id: 'dns-lookup', name: 'DNS Lookup', icon: <SearchCode size={16} />, color: 'text-indigo-400' },
+      { id: 'reverse-dns', name: 'PTR Checker', icon: <Hash size={16} />, color: 'text-violet-400' },
+      { id: 'ip-geolocation', name: 'IP Geo Checker', icon: <MapPin size={16} />, color: 'text-cyan-400' },
+      { id: 'whois-checker', name: 'WHOIS Checker', icon: <Calendar size={16} />, color: 'text-lime-400' },
     ],
-    forensics: [
-      { id: 'email-master', name: 'Email Master', icon: <FileCode2 size={16} />, color: 'text-indigo-400' },
+    design: [
+      { id: 'email-builder', name: 'Email Builder', icon: <Layout size={16} />, color: 'text-indigo-400' },
+      { id: 'grapes-builder', name: 'HTML Designer', icon: <Box size={16} />, color: 'text-emerald-500' },
+      { id: 'email-master', name: 'HTML Editor', icon: <FileCode2 size={16} />, color: 'text-indigo-400' },
       { id: 'html-cleaner', name: 'HTML Cleaner', icon: <Scissors size={16} />, color: 'text-emerald-400' },
-      { id: 'email-header-analyzer', name: 'Header Forensic', icon: <FileText size={16} />, color: 'text-orange-400' },
-      { id: 'ip-geolocation', name: 'IP Geolocation', icon: <MapPin size={16} />, color: 'text-cyan-400' },
-      { id: 'whois-checker', name: 'Domain Expiry', icon: <Calendar size={16} />, color: 'text-lime-400' },
-      { id: 'mime-encoder', name: 'MIME Studio', icon: <Code2 size={16} />, color: 'text-fuchsia-400' },
-      { id: 'subject-encoder', name: 'Subject Studio', icon: <Type size={16} />, color: 'text-fuchsia-500' },
+      { id: 'email-header-analyzer', name: 'Header Analyzer', icon: <FileText size={16} />, color: 'text-orange-400' },
+      { id: 'mime-encoder', name: 'MIME Tool', icon: <Code2 size={16} />, color: 'text-fuchsia-400' },
+      { id: 'subject-encoder', name: 'Subject Encoder', icon: <Type size={16} />, color: 'text-fuchsia-500' },
     ]
   };
 
-  const allTools = Object.values(tools).flat();
+  const allToolsList = Object.values(tools).flat();
 
   const filteredTools = searchQuery.trim() 
-    ? allTools.filter(t => t.name.toLowerCase().includes(searchQuery.toLowerCase()))
+    ? allToolsList.filter(t => t.name.toLowerCase().includes(searchQuery.toLowerCase()))
     : [];
 
   const handleNavigate = (view: string) => {
@@ -103,28 +114,28 @@ const Navbar: React.FC<NavbarProps> = ({ onNavigate, theme, onToggleTheme }) => 
               <Shield className="text-white" size={22} />
             </div>
             <span className={`text-xl font-black tracking-tighter ${isDark ? 'text-white' : 'text-slate-900'}`}>
-              AUTH<span className="text-indigo-500">PRO</span>
+              TOOL<span className="text-indigo-500">BOX</span>
             </span>
           </button>
 
           <div className="hidden lg:flex items-center gap-1 ml-4 flex-1">
-            <NavButton onClick={() => handleNavigate('dkim-checker')} label="DKIM" theme={theme} />
-            <NavButton onClick={() => handleNavigate('spf-validator')} label="SPF" theme={theme} />
-            <NavButton onClick={() => handleNavigate('dmarc-checker')} label="DMARC" theme={theme} />
+            <NavButton onClick={() => handleNavigate('bulk-blacklist')} label="BLACKLIST" theme={theme} />
+            <NavButton onClick={() => handleNavigate('spamhaus-checker')} label="SPAMHAUS" theme={theme} />
+            <NavButton onClick={() => handleNavigate('barracuda-checker')} label="BARRACUDA" theme={theme} />
             
             <div 
               className="relative"
               onMouseEnter={() => setIsAllToolsOpen(true)}
               onMouseLeave={() => setIsAllToolsOpen(false)}
             >
-              <button className={`flex items-center gap-1.5 px-4 py-2 rounded-lg text-sm font-bold transition-all ${isDark ? 'text-slate-400 hover:text-white hover:bg-slate-800' : 'text-slate-600 hover:text-indigo-600 hover:bg-slate-100'}`}>
-                ALL TOOLS <ChevronDown size={14} className={`transition-transform duration-200 ${isAllToolsOpen ? 'rotate-180' : ''}`} />
+              <button className={`flex items-center gap-1.5 px-4 py-2 rounded-lg text-[10px] font-black uppercase tracking-widest transition-all ${isDark ? 'text-slate-400 hover:text-white hover:bg-slate-800' : 'text-slate-600 hover:text-indigo-600 hover:bg-slate-100'}`}>
+                TOOLS <ChevronDown size={14} className={`transition-transform duration-200 ${isAllToolsOpen ? 'rotate-180' : ''}`} />
               </button>
 
               {isAllToolsOpen && (
-                <div className={`absolute top-full left-1/2 -translate-x-1/2 w-[800px] shadow-2xl rounded-2xl border p-8 grid grid-cols-3 gap-8 animate-in fade-in slide-in-from-top-2 duration-200 ${isDark ? 'bg-slate-900 border-slate-800' : 'bg-white border-slate-200'}`}>
+                <div className={`absolute top-full left-1/2 -translate-x-1/2 w-[840px] shadow-2xl rounded-3xl border p-8 grid grid-cols-3 gap-8 animate-in fade-in slide-in-from-top-2 duration-200 ${isDark ? 'bg-slate-900 border-slate-800' : 'bg-white border-slate-200'}`}>
                   <div>
-                    <h3 className="text-[10px] font-black text-slate-500 uppercase tracking-widest mb-4">Security</h3>
+                    <h3 className="text-[10px] font-black text-slate-500 uppercase tracking-[0.2em] mb-4">Security</h3>
                     <div className="space-y-1">
                       {tools.authentication.map(t => (
                         <MegaMenuButton key={t.id} icon={t.icon} label={t.name} onClick={() => handleNavigate(t.id)} theme={theme} colorClass={t.color} />
@@ -132,7 +143,7 @@ const Navbar: React.FC<NavbarProps> = ({ onNavigate, theme, onToggleTheme }) => 
                     </div>
                   </div>
                   <div>
-                    <h3 className="text-[10px] font-black text-slate-500 uppercase tracking-widest mb-4">Infrastructure</h3>
+                    <h3 className="text-[10px] font-black text-slate-500 uppercase tracking-[0.2em] mb-4">Network</h3>
                     <div className="space-y-1">
                       {tools.infrastructure.map(t => (
                         <MegaMenuButton key={t.id} icon={t.icon} label={t.name} onClick={() => handleNavigate(t.id)} theme={theme} colorClass={t.color} />
@@ -140,9 +151,9 @@ const Navbar: React.FC<NavbarProps> = ({ onNavigate, theme, onToggleTheme }) => 
                     </div>
                   </div>
                   <div>
-                    <h3 className="text-[10px] font-black text-slate-500 uppercase tracking-widest mb-4">Forensics</h3>
+                    <h3 className="text-[10px] font-black text-slate-500 uppercase tracking-[0.2em] mb-4">Content</h3>
                     <div className="space-y-1">
-                      {tools.forensics.map(t => (
+                      {tools.design.map(t => (
                         <MegaMenuButton key={t.id} icon={t.icon} label={t.name} onClick={() => handleNavigate(t.id)} theme={theme} colorClass={t.color} />
                       ))}
                     </div>
@@ -165,7 +176,7 @@ const Navbar: React.FC<NavbarProps> = ({ onNavigate, theme, onToggleTheme }) => 
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
                   onFocus={() => setIsSearchFocused(true)}
-                  placeholder="Find tool..."
+                  placeholder="Search tools..."
                   className={`w-full bg-transparent border-none outline-none text-xs font-bold ${isDark ? 'text-slate-200 placeholder:text-slate-600' : 'text-slate-700 placeholder:text-slate-400'}`}
                 />
               </div>
@@ -190,7 +201,6 @@ const Navbar: React.FC<NavbarProps> = ({ onNavigate, theme, onToggleTheme }) => 
                           <p className={`text-[11px] font-black uppercase tracking-tight ${isDark ? 'text-slate-200' : 'text-slate-800'}`}>
                             {tool.name}
                           </p>
-                          <p className="text-[8px] text-slate-500 font-bold tracking-widest uppercase">Tool Module</p>
                         </div>
                       </button>
                     ))}
@@ -221,7 +231,7 @@ const Navbar: React.FC<NavbarProps> = ({ onNavigate, theme, onToggleTheme }) => 
 };
 
 const NavButton: React.FC<{ onClick: () => void; label: string; theme: string }> = ({ onClick, label, theme }) => (
-  <button onClick={onClick} className={`px-4 py-2 rounded-lg text-sm font-bold transition-all ${theme === 'dark' ? 'text-slate-400 hover:text-white hover:bg-slate-800' : 'text-slate-600 hover:text-indigo-600 hover:bg-slate-100'}`}>
+  <button onClick={onClick} className={`px-4 py-2 rounded-lg text-[10px] font-black tracking-widest uppercase transition-all ${theme === 'dark' ? 'text-slate-400 hover:text-white hover:bg-slate-800' : 'text-slate-600 hover:text-indigo-600 hover:bg-slate-100'}`}>
     {label}
   </button>
 );
@@ -231,7 +241,7 @@ const MegaMenuButton: React.FC<{ icon: React.ReactNode; label: string; onClick: 
     <div className={`p-2 rounded-lg transition-transform group-hover:scale-110 ${theme === 'dark' ? 'bg-slate-950' : 'bg-white shadow-sm border border-slate-100'}`}>
       <span className={colorClass}>{icon}</span>
     </div>
-    <span className={`text-xs font-bold transition-colors ${theme === 'dark' ? 'text-slate-400 group-hover:text-white' : 'text-slate-600 group-hover:text-indigo-600'}`}>
+    <span className={`text-[11px] font-bold uppercase transition-colors ${theme === 'dark' ? 'text-slate-400 group-hover:text-white' : 'text-slate-600 group-hover:text-indigo-600'}`}>
       {label}
     </span>
   </button>

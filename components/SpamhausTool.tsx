@@ -151,8 +151,8 @@ const SpamhausTool: React.FC<SpamhausToolProps> = ({ onBack, theme }) => {
               <ShieldAlert size={28} />
             </div>
             <div>
-              <h1 className="text-xl md:text-2xl font-black tracking-tight uppercase">Spamhaus Forensic</h1>
-              <p className="text-slate-500 text-[10px] font-black uppercase tracking-widest opacity-60">XBL / CSS / DBL Active Timeline</p>
+              <h1 className="text-xl md:text-2xl font-black tracking-tight uppercase">Spamhaus Checker</h1>
+              <p className="text-slate-500 text-[10px] font-black uppercase tracking-widest opacity-60">Bulk status check for IPs and Domains</p>
             </div>
           </div>
         </div>
@@ -174,7 +174,7 @@ const SpamhausTool: React.FC<SpamhausToolProps> = ({ onBack, theme }) => {
             disabled={isProcessing || uniqueInputs.length === 0}
             className="w-full sm:w-auto self-end px-12 py-4 bg-rose-600 hover:bg-rose-500 text-white rounded-2xl font-black uppercase tracking-widest text-[10px] shadow-2xl disabled:opacity-50 flex items-center justify-center gap-3 transition-all"
           >
-            {isProcessing ? <><Loader2 size={16} className="animate-spin" /> Querying DQS...</> : <><Zap size={16} /> Run Forensic Audit</>}
+            {isProcessing ? <><Loader2 size={16} className="animate-spin" /> Checking...</> : <><Zap size={16} /> Run Checker</>}
           </button>
         </div>
       </div>
@@ -186,7 +186,7 @@ const SpamhausTool: React.FC<SpamhausToolProps> = ({ onBack, theme }) => {
               <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-500" size={14} />
               <input
                 type="text"
-                placeholder="Search result matrix..."
+                placeholder="Search results..."
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
                 className={`w-full pl-10 pr-4 py-2.5 border rounded-xl outline-none text-xs font-bold transition-all ${inputClasses}`}
@@ -204,11 +204,11 @@ const SpamhausTool: React.FC<SpamhausToolProps> = ({ onBack, theme }) => {
             <table className="w-full text-left">
               <thead>
                 <tr className={`${isDark ? 'bg-[#05080f] border-[#1e293b]' : 'bg-slate-100 border-slate-200'} border-b text-[10px] font-black uppercase tracking-widest text-slate-500`}>
-                  <th className="px-6 py-4 w-16 text-center">Sl No</th>
-                  <th className="px-6 py-4">Forensic Identifier</th>
+                  <th className="px-6 py-4 w-16 text-center">No</th>
+                  <th className="px-6 py-4">Identifier</th>
                   <th className="px-6 py-4 text-center">Listed</th>
-                  <th className="px-6 py-4">Dataset(s)</th>
-                  <th className="px-6 py-4 min-w-[320px]">Release Timeline (IST)</th>
+                  <th className="px-6 py-4">Lists</th>
+                  <th className="px-6 py-4 min-w-[320px]">Timeline (IST)</th>
                 </tr>
               </thead>
               <tbody className={`divide-y ${isDark ? 'divide-[#1e293b]' : 'divide-slate-100'}`}>
@@ -218,7 +218,7 @@ const SpamhausTool: React.FC<SpamhausToolProps> = ({ onBack, theme }) => {
                     <td className="px-6 py-4">
                       <div className="flex flex-col">
                          <span className={`text-sm font-black tracking-tight ${isDark ? 'text-slate-100' : 'text-slate-900'}`}>{r.input}</span>
-                         <span className="text-[8px] text-slate-500 font-black uppercase tracking-widest mt-0.5">{r.type} IDENT</span>
+                         <span className="text-[8px] text-slate-500 font-black uppercase tracking-widest mt-0.5">{r.type} Check</span>
                       </div>
                     </td>
                     <td className="px-6 py-4 text-center">
@@ -245,7 +245,7 @@ const SpamhausTool: React.FC<SpamhausToolProps> = ({ onBack, theme }) => {
       )}
 
       <footer className={`mt-auto pt-10 border-t flex justify-between items-center text-[10px] font-black text-slate-600 uppercase tracking-widest ${isDark ? 'border-slate-800' : 'border-slate-200'}`}>
-        <p>© {new Date().getFullYear()} Authenticator Pro Lab</p>
+        <p>© {new Date().getFullYear()} Toolbox</p>
         <a href="https://www.spamhaus.org/" target="_blank" className="hover:text-rose-400">Policy Center</a>
       </footer>
     </div>
@@ -257,7 +257,7 @@ const ReleaseDateCell: React.FC<{ releaseDate?: string; listed: boolean }> = ({ 
   if (!releaseDate || releaseDate === 'pending_history') {
     return (
       <div className="flex items-center gap-2 text-[10px] text-slate-500 font-bold uppercase tracking-widest animate-pulse">
-        <Loader2 size={12} className="animate-spin" /> Fetching Timeline...
+        <Loader2 size={12} className="animate-spin" /> Loading...
       </div>
     );
   }

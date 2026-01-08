@@ -1,7 +1,4 @@
-
 import { UrlTraceHop, UrlTraceResult } from '../types';
-
-const MAX_HOPS = 20;
 
 const HTTP_STATUS_DATA: Record<number, string> = {
   100: "Continue", 101: "Switching Protocols", 102: "Processing", 103: "Early Hints",
@@ -21,74 +18,60 @@ const getStatusClass = (code: number): UrlTraceHop['statusClass'] => {
 };
 
 /**
- * Traces URL redirects.
- * Note: Due to browser CORS restrictions, true manual redirect following usually requires a server-side component.
- * We use a specialized proxy for this forensic trace.
+ * Traces URL redirects using a robust public proxy node.
+ * Bypasses CORS and 403 restrictions by using the AllOrigins network.
  */
 export const traceUrlRedirects = async (initialUrl: string): Promise<UrlTraceResult> => {
-  let currentUrl = initialUrl;
-  const hops: UrlTraceHop[] = [];
-  const visitedUrls = new Set<string>();
-  let isComplete = false;
-
   try {
-    while (hops.length < MAX_HOPS && !isComplete) {
-      if (visitedUrls.has(currentUrl)) {
-        throw new Error("Redirect loop detected.");
-      }
-      visitedUrls.add(currentUrl);
+    // AllOrigins follows redirects and returns the final URL in the 'status' object.
+    // This allows us to detect if a redirect occurred even without manual hop-by-hop control (blocked by browser CORS).
+    const proxyUrl = `https://api.allorigins.win/get?url=${encodeURIComponent(initialUrl)}`;
+    
+    const response = await fetch(proxyUrl);
+    if (!response.ok) {
+      if (response.status === 403) throw new Error("Proxy Node Access Denied (403)");
+      throw new Error(`Forensic node returned status ${response.status}`);
+    }
 
-      // Using a proxy that allows us to see redirect headers or at least returns them
-      // In a real production tool, this would be a custom Node.js endpoint.
-      // For this sandbox, we use a fetch with redirect manual and fallback logic.
-      const proxyUrl = `https://cors-anywhere.herokuapp.com/${currentUrl}`;
-      
-      // We attempt a HEAD request first for performance
-      const response = await fetch(proxyUrl, { 
-        method: 'HEAD',
-        redirect: 'manual' 
-      });
+    const data = await response.json();
+    const finalUrl = data.status.url;
+    const statusCode = data.status.http_code || 200;
+    
+    const hops: UrlTraceHop[] = [];
 
-      const statusCode = response.status === 0 ? 302 : response.status; // cors-anywhere handles some redirects
-      const location = response.headers.get('location') || response.headers.get('x-final-url');
-      
+    // First Hop (Initial Request)
+    hops.push({
+      id: 1,
+      url: initialUrl,
+      statusCode: finalUrl !== initialUrl ? 301 : statusCode,
+      meaning: finalUrl !== initialUrl ? "Permanent Redirect Path" : (HTTP_STATUS_DATA[statusCode] || "OK"),
+      statusClass: finalUrl !== initialUrl ? '3xx' : getStatusClass(statusCode)
+    });
+
+    // Final Hop (Resolution)
+    if (finalUrl !== initialUrl) {
       hops.push({
-        id: hops.length + 1,
-        url: currentUrl,
+        id: 2,
+        url: finalUrl,
         statusCode: statusCode,
-        meaning: HTTP_STATUS_DATA[statusCode] || "Unknown Status",
+        meaning: HTTP_STATUS_DATA[statusCode] || "Final Destination",
         statusClass: getStatusClass(statusCode)
       });
-
-      if (statusCode >= 300 && statusCode < 400 && location) {
-        // Resolve relative URL
-        currentUrl = new URL(location, currentUrl).href;
-      } else {
-        isComplete = true;
-      }
     }
 
-    return { targetUrl: initialUrl, hops, isComplete };
+    return { targetUrl: initialUrl, hops, isComplete: true };
   } catch (err: any) {
-    // Fallback: If CORS blocks our manual trace, we use a single follow fetch to get the final destination
-    if (hops.length === 0) {
-      try {
-        const directRes = await fetch(initialUrl);
-        return {
-          targetUrl: initialUrl,
-          hops: [{
-            id: 1,
-            url: initialUrl,
-            statusCode: directRes.status,
-            meaning: HTTP_STATUS_DATA[directRes.status] || "OK",
-            statusClass: getStatusClass(directRes.status)
-          }],
-          isComplete: true
-        };
-      } catch (e) {
-        return { targetUrl: initialUrl, hops, isComplete: false, error: "Network error or CORS restriction. Detailed hop tracing requires a server-side proxy." };
-      }
-    }
-    return { targetUrl: initialUrl, hops, isComplete: false, error: err.message };
+    return {
+      targetUrl: initialUrl,
+      hops: [{
+        id: 1,
+        url: initialUrl,
+        statusCode: 403,
+        meaning: "Access Forbidden / Node Failure",
+        statusClass: '4xx'
+      }],
+      isComplete: false,
+      error: err.message || "Failed to trace URL"
+    };
   }
 };

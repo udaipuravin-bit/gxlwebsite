@@ -59,24 +59,6 @@ export interface WhoisResult {
   raw?: any;
 }
 
-export interface SSLResult {
-  id: number;
-  domain: string;
-  issuer: string;
-  validFrom: string;
-  validTo: string;
-  status: 'valid' | 'expired' | 'loading' | 'pending' | 'error';
-}
-
-export interface BlacklistResult {
-  id: number;
-  ip: string;
-  domain: string;
-  listed: boolean;
-  listsChecked: number;
-  status: 'clean' | 'listed' | 'loading' | 'pending';
-}
-
 export interface PtrResult {
   ip: string;
   hostname: string;
@@ -114,38 +96,6 @@ export interface DnsResponse {
   Answer?: DnsAnswer[];
 }
 
-export interface EmailHop {
-  hop: number;
-  from: string;
-  by: string;
-  with: string;
-  id: string;
-  date: string;
-  delaySeconds: number;
-}
-
-export interface HeaderAnalysisResult {
-  summary: {
-    from: string;
-    to: string;
-    subject: string;
-    date: string;
-    messageId: string;
-    returnPath: string;
-    authenticated: boolean;
-    riskLevel: 'low' | 'medium' | 'high';
-  };
-  auth: {
-    spf: string;
-    dkim: string;
-    dmarc: string;
-    arc?: string;
-  };
-  hops: EmailHop[];
-  anomalies: string[];
-  recommendations: string[];
-}
-
 export interface IpGeoResult {
   ip: string;
   hostname: string | null;
@@ -159,42 +109,16 @@ export interface IpGeoResult {
   status: 'valid' | 'invalid' | 'unknown';
 }
 
-export interface IpGeoAnalysis {
-  results: IpGeoResult[];
-  summary: {
-    total: number;
-    countries: Array<{ name: string; count: number }>;
-    isps: Array<{ name: string; count: number }>;
-  };
-}
-
 export type MimeEncodingType = 'auto' | 'base64' | 'quoted-printable';
 
-export interface MimeEncodingResult {
-  encoded: string;
-  decoded: string;
-  mode: 'encode' | 'decode';
-  type: MimeEncodingType;
-  headers: {
-    transferEncoding: string;
-    contentType: string;
-  };
-}
-
-export type SubjectStyle = 'normal' | 'uppercase' | 'titlecase' | 'bold' | 'italic' | 'monospace';
-
-export interface SubjectFormat {
-  id: string;
-  label: string;
-  active: boolean;
-}
-
-export interface SubjectEncodingResult {
-  id: string;
-  original: string;
-  styled: string;
-  encodings: Record<string, string>;
-  espCompatibility: Record<string, 'supported' | 'partial' | 'unsupported'>;
+export interface SpamCopResult {
+  id: number;
+  ip: string;
+  dnsbl: string;
+  status: 'listed' | 'clean' | 'error' | 'invalid' | 'loading' | 'pending';
+  returnCode: string;
+  meaning: string;
+  ttl: number;
 }
 
 export interface SpamhausResult {
@@ -204,8 +128,17 @@ export interface SpamhausResult {
   listed: boolean;
   datasets: string[];
   reason: string;
+  status: 'pending' | 'loading' | 'clean' | 'listed-high' | 'listed-low' | 'error';
   releaseDate?: string;
-  status: 'clean' | 'listed-high' | 'listed-low' | 'pending' | 'loading' | 'error';
+}
+
+export interface BarracudaResult {
+  id: number;
+  input: string;
+  type: 'ip' | 'domain';
+  status: 'listed' | 'clean' | 'error' | 'loading' | 'pending';
+  message: string;
+  categories: string[];
 }
 
 export type EmailMasterAction = 'optimize' | 'fix' | 'decode' | 'validate' | 'write';
@@ -232,4 +165,15 @@ export interface UrlTraceResult {
   hops: UrlTraceHop[];
   isComplete: boolean;
   error?: string;
+}
+
+export interface BlacklistAuditEntry {
+  id: number;
+  input: string;
+  type: 'ip' | 'domain';
+  ptr: string;
+  spamhaus: 'listed' | 'clean' | 'pending' | 'error';
+  spamcop: 'listed' | 'clean' | 'pending' | 'error' | 'n/a';
+  barracuda: 'listed' | 'clean' | 'pending' | 'error';
+  status: 'pending' | 'loading' | 'complete' | 'error';
 }
