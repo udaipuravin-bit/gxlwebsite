@@ -1,18 +1,11 @@
-
 import React, { useState, useMemo } from 'react';
 import { 
   Search, 
   Trash2, 
-  Play, 
-  Download, 
   Globe, 
-  Loader2,
-  CheckCircle2,
-  XCircle,
-  Clock,
-  AlertCircle,
-  ArrowLeft,
-  AlertTriangle
+  Loader2, 
+  ArrowLeft, 
+  Zap 
 } from 'lucide-react';
 import { SpfResult } from '../types';
 import { lookupSpfRecord } from '../services/dnsService';
@@ -47,7 +40,6 @@ const SpfTool: React.FC<SpfToolProps> = ({ onBack, theme }) => {
   const handleProcess = async () => {
     if (!domainsInput.trim()) return;
     
-    // Fix: Explicitly type domainList and use Set<string> to prevent 'unknown' type inference in bulk validation
     const domainList: string[] = Array.from(new Set<string>(
       domainsInput.split(/[\n,]/).map(d => d.trim().toLowerCase()).filter(d => d.length > 0)
     ));
@@ -72,18 +64,6 @@ const SpfTool: React.FC<SpfToolProps> = ({ onBack, theme }) => {
     setIsProcessing(false);
   };
 
-  const handleExport = () => {
-    const csvContent = [['S.No', 'Domain', 'Status', 'Lookups', 'Mechanism', 'Record'], ...results.map(r => [r.id, r.domain, r.status, r.lookupCount, r.mechanism, r.record])].map(e => e.join(",")).join("\n");
-    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
-    const url = URL.createObjectURL(blob);
-    const link = document.createElement("a");
-    link.setAttribute("href", url);
-    link.setAttribute("download", `spf_results_${new Date().toISOString().slice(0, 10)}.csv`);
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
-  };
-
   const filteredResults = useMemo(() => {
     return results.filter(r => {
       const q = searchQuery.toLowerCase();
@@ -101,142 +81,110 @@ const SpfTool: React.FC<SpfToolProps> = ({ onBack, theme }) => {
     };
   }, [results]);
 
-  const cardClasses = isDark ? 'bg-[#0a0f18] border-[#1e293b] text-slate-100' : 'bg-white border-slate-200 text-slate-900';
-  const inputClasses = isDark ? 'bg-[#05080f] border-[#1e293b] text-slate-200' : 'bg-slate-50 border-slate-200 text-slate-900';
+  const cardClasses = isDark ? 'bg-[#0a0f18] border-[#1e293b] text-slate-100 shadow-2xl' : 'bg-white border-slate-200 text-slate-900 shadow-xl';
+  const inputClasses = isDark ? 'bg-[#05080f] border-[#1e293b] text-slate-200 focus:border-amber-500' : 'bg-slate-50 border-slate-200 text-slate-900 focus:border-amber-600';
 
   return (
-    <div className="min-h-screen p-4 md:p-8 flex flex-col gap-6 max-w-7xl mx-auto animate-in fade-in duration-500">
-      <header className={`flex items-center justify-between p-6 rounded-2xl shadow-xl border ${cardClasses}`}>
+    <div className="min-h-screen px-4 pt-3 pb-8 md:px-8 md:pt-4 md:pb-8 flex flex-col gap-6 max-w-7xl mx-auto animate-in fade-in duration-500">
+      <header className={`flex items-center justify-between p-5 rounded-[2rem] border ${cardClasses}`}>
         <div className="flex items-center gap-4">
           <button onClick={onBack} className={`p-2 rounded-xl border transition-all ${isDark ? 'bg-slate-800 border-slate-700 text-slate-400 hover:text-white' : 'bg-slate-100 border-slate-200 text-slate-600'}`}>
             <ArrowLeft size={20} />
           </button>
           <div className="flex items-center gap-3">
-            <div className="bg-violet-500 p-2.5 rounded-xl text-white shadow-lg">
+            <div className="bg-amber-500 p-2.5 rounded-xl text-white shadow-lg">
               <Globe size={28} />
             </div>
             <div>
-              <h1 className="text-xl md:text-2xl font-black tracking-tight uppercase">SPF Validator</h1>
-              <p className="text-slate-500 text-[10px] font-black uppercase tracking-widest opacity-60">DNS Lookup & Logic Audit</p>
+              <h1 className="text-xl md:text-2xl font-black tracking-tight uppercase text-amber-500">SPF Checker</h1>
+              <p className="text-slate-500 text-[10px] font-black uppercase tracking-widest opacity-60">Recursive Logic Matrix</p>
             </div>
           </div>
         </div>
-        <div className="flex gap-2">
-          {results.length > 0 && (
-            <button onClick={handleExport} className={`flex items-center gap-2 px-4 py-2 rounded-lg font-bold text-xs border uppercase tracking-widest ${isDark ? 'bg-slate-800 border-slate-700 text-slate-200 hover:bg-slate-700' : 'bg-slate-100 border-slate-200 text-slate-700'}`}>
-              <Download size={16} /> Export CSV
-            </button>
-          )}
-        </div>
+        {results.length > 0 && <button onClick={() => {setResults([]); setDomainsInput('');}} className="p-2.5 bg-rose-500/10 text-rose-400 hover:bg-rose-500/20 rounded-2xl border border-rose-500/20 transition-all"><Trash2 size={20} /></button>}
       </header>
 
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        <div className={`lg:col-span-2 p-6 rounded-2xl shadow-xl border ${cardClasses} space-y-4`}>
-          <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest">Domains List</label>
-          <textarea
-            value={domainsInput}
-            onChange={(e) => setDomainsInput(e.target.value)}
-            placeholder="example.com&#10;gmail.com"
-            className={`w-full h-48 p-4 rounded-xl focus:ring-2 focus:ring-violet-500 focus:border-transparent outline-none transition-all font-mono text-xs resize-none ${inputClasses}`}
-          />
-        </div>
-
-        <div className={`p-6 rounded-2xl shadow-xl border flex flex-col justify-between ${cardClasses}`}>
-          <div className={`${isDark ? 'bg-[#05080f]' : 'bg-slate-50'} rounded-2xl p-6 border border-slate-800/50 text-center`}>
-             <p className="text-[10px] text-slate-500 uppercase tracking-widest font-black mb-2">Processed</p>
-             <div className={`text-4xl font-black ${isDark ? 'text-white' : 'text-slate-900'}`}>
-               {stats.processed} <span className="text-slate-700">/</span> {stats.total}
-             </div>
+      <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
+        <div className="lg:col-span-4 flex flex-col gap-6">
+          <div className={`p-6 rounded-[2rem] border flex flex-col gap-4 ${cardClasses}`}>
+            <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest">Target Domains Matrix</label>
+            <textarea
+              value={domainsInput}
+              onChange={(e) => setDomainsInput(e.target.value)}
+              placeholder="example.com&#10;gmail.com"
+              className={`w-full h-56 p-4 rounded-xl outline-none transition-all font-mono text-xs resize-none ${inputClasses}`}
+            />
+            <button
+              onClick={handleProcess}
+              disabled={isProcessing || !domainsInput.trim()}
+              className="w-full py-4 bg-amber-600 hover:bg-amber-500 text-white rounded-2xl font-black uppercase tracking-widest text-[10px] shadow-lg flex items-center justify-center gap-2 transition-all"
+            >
+              {isProcessing ? <><Loader2 className="animate-spin" size={16} /> Auditing...</> : <><Zap size={16} /> Run Logic Audit</>}
+            </button>
           </div>
-          <button
-            onClick={handleProcess}
-            disabled={isProcessing || !domainsInput}
-            className="w-full mt-6 py-4 bg-violet-600 hover:bg-violet-500 text-white rounded-xl font-black uppercase tracking-widest text-[10px] shadow-lg"
-          >
-            {isProcessing ? 'Validating Matrix...' : 'Run SPF Audit'}
-          </button>
         </div>
-      </div>
 
-      {results.length > 0 && (
-        <div className={`rounded-2xl shadow-xl border overflow-hidden ${cardClasses}`}>
+        <div className={`lg:col-span-8 rounded-[2rem] border overflow-hidden animate-in slide-in-from-right-4 duration-500 flex flex-col ${cardClasses}`}>
           <div className={`p-4 border-b flex flex-col sm:flex-row sm:items-center justify-between gap-4 ${isDark ? 'bg-[#05080f] border-[#1e293b]' : 'bg-slate-50 border-slate-100'}`}>
             <div className="flex gap-2">
-              <button onClick={() => setFilterStatus('all')} className={`px-4 py-2 rounded-lg text-[10px] font-black uppercase tracking-widest transition-all min-w-[120px] ${filterStatus === 'all' ? 'bg-white text-slate-950 border-white' : 'bg-slate-900 border-slate-800 text-slate-400'}`}>
-                TOTAL ({stats.total})
-              </button>
-              <button onClick={() => setFilterStatus('valid')} className={`px-4 py-2 rounded-lg text-[10px] font-black uppercase tracking-widest border transition-all min-w-[120px] ${filterStatus === 'valid' ? 'bg-emerald-600 text-white border-emerald-500' : 'bg-slate-900 border-emerald-500/20 text-emerald-500'}`}>
-                VALID ({stats.valid})
-              </button>
+              <button onClick={() => setFilterStatus('all')} className={`px-4 py-2 rounded-xl text-[9px] font-black uppercase tracking-widest transition-all border ${filterStatus === 'all' ? 'bg-white text-slate-950 border-white' : 'bg-slate-900 border-slate-800 text-slate-500'}`}>Total ({stats.total})</button>
+              <button onClick={() => setFilterStatus('valid')} className={`px-4 py-2 rounded-xl text-[9px] font-black uppercase tracking-widest transition-all border ${filterStatus === 'valid' ? 'bg-emerald-600 text-white border-emerald-500' : 'bg-slate-900 border-slate-800 text-slate-500'}`}>Valid ({stats.valid})</button>
             </div>
-            <div className="relative flex-1 max-w-md ml-auto">
+            <div className="relative flex-1 max-w-md w-full ml-auto">
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-500" size={14} />
               <input
                 type="text"
-                placeholder="Search matrix..."
+                placeholder="Filter results matrix..."
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
-                className={`w-full pl-9 pr-4 py-2 border rounded-lg outline-none text-xs font-bold transition-all ${inputClasses}`}
+                className={`w-full pl-9 pr-4 py-2 border rounded-xl outline-none text-xs font-bold transition-all ${inputClasses}`}
               />
             </div>
           </div>
 
-          <div className="overflow-x-auto">
+          <div className="flex-1 overflow-auto min-h-[400px]">
             <table className="w-full text-left">
               <thead>
-                <tr className={`${isDark ? 'bg-[#05080f] border-[#1e293b]' : 'bg-slate-100 border-slate-200'} border-b text-[10px] font-black uppercase tracking-[0.2em] text-slate-500`}>
-                  <th className="px-6 py-4 w-20">SL NO</th>
-                  <th className="px-6 py-4">DOMAIN</th>
-                  <th className="px-6 py-4 text-center">LOOKUPS</th>
-                  <th className="px-6 py-4">SPF RECORD</th>
+                <tr className={`${isDark ? 'bg-[#05080f] border-[#1e293b]' : 'bg-slate-100 border-slate-200'} border-b text-[10px] font-black uppercase tracking-widest text-slate-600`}>
+                  <th className="px-6 py-4 w-12 text-center">ID</th>
+                  <th className="px-6 py-4">Domain</th>
+                  <th className="px-6 py-4 text-center">Lookups</th>
+                  <th className="px-6 py-4">SPF Record Output</th>
                 </tr>
               </thead>
               <tbody className={`divide-y ${isDark ? 'divide-[#1e293b]' : 'divide-slate-100'}`}>
-                {filteredResults.map((result, index) => (
-                  <tr key={result.id} className="hover:bg-indigo-500/5 transition-colors group">
-                    <td className="px-6 py-4 text-[10px] font-mono font-bold text-slate-600">{index + 1}</td>
+                {filteredResults.length > 0 ? filteredResults.map((result, index) => (
+                  <tr key={result.id} className="hover:bg-amber-500/5 transition-all group">
+                    <td className="px-6 py-4 text-[10px] font-mono font-bold text-slate-600 text-center">{index + 1}</td>
                     <td className="px-6 py-4">
                       <div className="flex flex-col">
-                        <span className={`text-sm font-bold tracking-tight ${isDark ? 'text-slate-100' : 'text-slate-900'}`}>{result.domain}</span>
-                        <SpfStatusBadge status={result.status} />
+                        <span className={`text-sm font-black tracking-tight ${isDark ? 'text-white' : 'text-slate-900'}`}>{result.domain}</span>
+                        <span className={`text-[8px] font-black uppercase tracking-widest ${result.status === 'valid' ? 'text-emerald-500' : 'text-rose-500'}`}>{result.status}</span>
                       </div>
                     </td>
                     <td className="px-6 py-4 text-center">
-                      <span className={`text-xs font-black ${result.lookupCount > 10 ? 'text-rose-500' : 'text-slate-500'}`}>
-                        {result.lookupCount} <span className="opacity-40">/ 10</span>
-                      </span>
+                      <span className={`text-xs font-black ${result.lookupCount > 10 ? 'text-rose-500' : 'text-slate-500'}`}>{result.lookupCount} <span className="opacity-40">/ 10</span></span>
                     </td>
                     <td className="px-6 py-4">
                       {result.record ? (
-                        <code className={`block text-[10px] font-mono p-2 rounded border truncate max-w-sm ${isDark ? 'bg-slate-950 border-slate-800 text-violet-400/80' : 'bg-slate-50 border-slate-200 text-violet-700'}`}>
+                        <code className={`block text-[10px] font-mono p-2.5 rounded-xl border truncate max-w-sm ${isDark ? 'bg-slate-950 border-slate-800 text-amber-400' : 'bg-slate-50 border-slate-100 text-amber-700'}`}>
                           {result.record}
                         </code>
-                      ) : (
-                        <span className="text-[10px] text-slate-600 italic">No record found</span>
-                      )}
+                      ) : <span className="text-[10px] text-slate-600 font-bold italic tracking-wide opacity-40">Empty response</span>}
                     </td>
                   </tr>
-                ))}
+                )) : (
+                  <tr>
+                    <td colSpan={4} className="px-6 py-32 text-center text-slate-600 opacity-20 uppercase font-black text-xs tracking-widest">No Data Analyzed</td>
+                  </tr>
+                )}
               </tbody>
             </table>
           </div>
         </div>
-      )}
+      </div>
     </div>
   );
-};
-
-const SpfStatusBadge: React.FC<{ status: SpfResult['status'] }> = ({ status }) => {
-  const styles = {
-    valid: 'text-emerald-500',
-    warning: 'text-amber-500',
-    loading: 'text-blue-400 animate-pulse',
-    invalid: 'text-rose-500',
-    missing: 'text-rose-500',
-    error: 'text-rose-500',
-    pending: 'text-slate-700'
-  };
-  return <span className={`text-[9px] font-black uppercase tracking-widest ${styles[status]}`}>{status}</span>;
 };
 
 export default SpfTool;

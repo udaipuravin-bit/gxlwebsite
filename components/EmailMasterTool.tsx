@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import { 
   ArrowLeft, 
@@ -14,8 +15,6 @@ import {
   Moon,
   Zap,
   Play,
-  Lock,
-  Unlock,
   GripVertical,
   Search
 } from 'lucide-react';
@@ -83,7 +82,6 @@ const EmailMasterTool: React.FC<EmailMasterToolProps> = ({ onBack, theme: initia
   const containerRef = useRef<HTMLDivElement>(null);
   const editorRef = useRef<any>(null);
 
-  // Sync theme with localStorage
   useEffect(() => {
     const saved = localStorage.getItem('email-master-theme');
     if (saved === 'dark' || saved === 'light') setActiveTheme(saved);
@@ -95,7 +93,6 @@ const EmailMasterTool: React.FC<EmailMasterToolProps> = ({ onBack, theme: initia
     localStorage.setItem('email-master-theme', next);
   };
 
-  // Draggable Divider Logic
   const startResizing = useCallback((e: React.MouseEvent) => {
     e.preventDefault();
     setIsResizing(true);
@@ -127,7 +124,6 @@ const EmailMasterTool: React.FC<EmailMasterToolProps> = ({ onBack, theme: initia
     };
   }, [isResizing, resize, stopResizing]);
 
-  // Preview Update
   useEffect(() => {
     const timeout = setTimeout(() => {
       const content = jsEnabled ? code : code.replace(/<script\b[^>]*>([\s\S]*?)<\/script>/gim, '');
@@ -229,19 +225,10 @@ const EmailMasterTool: React.FC<EmailMasterToolProps> = ({ onBack, theme: initia
 
   return (
     <div className={`h-[calc(100vh-64px)] flex flex-col overflow-hidden ${isDark ? 'bg-slate-950 text-slate-100' : 'bg-slate-50 text-slate-900'}`}>
-      
-      {/* Top Toolbar */}
       <header className={`shrink-0 h-14 px-4 flex items-center justify-between border-b shadow-sm z-[100] ${toolbarClasses}`}>
         <div className="flex items-center gap-3">
-          <button onClick={onBack} className={`p-2 rounded-lg hover:bg-slate-500/10 transition-colors ${isDark ? 'text-slate-400' : 'text-slate-600'}`}>
-            <ArrowLeft size={18} />
-          </button>
-          <div className="flex items-center gap-2">
-            <div className="bg-indigo-600 p-1.5 rounded-lg text-white">
-              <Code2 size={16} />
-            </div>
-            <h1 className="text-sm font-black uppercase tracking-widest hidden sm:block">HTML Editor</h1>
-          </div>
+          <button onClick={onBack} className={`p-2 rounded-lg hover:bg-slate-500/10 transition-colors ${isDark ? 'text-slate-400' : 'text-slate-600'}`}><ArrowLeft size={18} /></button>
+          <div className="flex items-center gap-2"><div className="bg-indigo-600 p-1.5 rounded-lg text-white"><Code2 size={16} /></div><h1 className="text-sm font-black uppercase tracking-widest hidden sm:block">HTML Editor</h1></div>
           <div className="h-6 w-px bg-slate-800 mx-2 hidden md:block" />
           <div className="flex items-center gap-1">
              <ToolButton onClick={() => setCode(code)} icon={<Play size={14}/>} label="Run" color="emerald" isDark={isDark} />
@@ -251,109 +238,42 @@ const EmailMasterTool: React.FC<EmailMasterToolProps> = ({ onBack, theme: initia
              <ToolButton onClick={triggerFind} icon={<Search size={14}/>} label="Find" isDark={isDark} />
           </div>
         </div>
-
         <div className="flex items-center gap-2">
           <div className="flex p-1 rounded-lg bg-black/20 mr-2 md:mr-4 border border-slate-800">
              <DecodeButton onClick={() => handleAction('base64')} label="B64" isDark={isDark} />
              <DecodeButton onClick={() => handleAction('quoted-printable')} label="QP" isDark={isDark} />
              <DecodeButton onClick={() => handleAction('auto')} label="Auto" isDark={isDark} highlight />
           </div>
-          <button onClick={toggleTheme} className={`p-2 rounded-lg hover:bg-slate-500/10 transition-colors ${isDark ? 'text-yellow-400' : 'text-slate-600'}`}>
-            {isDark ? <Sun size={18} /> : <Moon size={18} />}
-          </button>
+          <button onClick={toggleTheme} className={`p-2 rounded-lg hover:bg-slate-500/10 transition-colors ${isDark ? 'text-yellow-400' : 'text-slate-600'}`}>{isDark ? <Sun size={18} /> : <Moon size={18} />}</button>
         </div>
       </header>
 
-      {/* Main Split Editor */}
       <div ref={containerRef} className="flex-1 flex min-h-0 relative">
-        
-        {/* Editor Pane */}
         <div style={{ width: `${splitPosition}%` }} className="h-full relative flex flex-col bg-[#0f172a] transition-[width] duration-0">
-          <div className="h-8 bg-[#1e293b] flex items-center px-4 justify-between border-b border-slate-800 shrink-0 select-none">
-             <span className="text-[10px] font-black uppercase tracking-widest text-slate-500">Editor</span>
-          </div>
-          <div className="flex-1 min-h-0 relative z-[10] overflow-visible">
-            <Editor
-              height="100%"
-              defaultLanguage="html"
-              theme={isDark ? "cyber-audit" : "light"}
-              value={code}
-              onChange={(v) => setCode(v || '')}
-              beforeMount={handleEditorWillMount}
-              onMount={handleEditorDidMount}
-              options={editorOptions}
-            />
-          </div>
+          <div className="h-8 bg-[#1e293b] flex items-center px-4 justify-between border-b border-slate-800 shrink-0 select-none"><span className="text-[10px] font-black uppercase tracking-widest text-slate-500">Editor</span></div>
+          <div className="flex-1 min-h-0 relative z-[10] overflow-visible"><Editor height="100%" defaultLanguage="html" theme={isDark ? "cyber-audit" : "light"} value={code} onChange={(v) => setCode(v || '')} beforeMount={handleEditorWillMount} onMount={handleEditorDidMount} options={editorOptions} /></div>
         </div>
-
-        {/* Resizer */}
-        <div onMouseDown={startResizing} onDoubleClick={() => setSplitPosition(50)} className={`w-1 h-full cursor-col-resize z-[150] flex items-center justify-center transition-all group shrink-0 select-none ${isDark ? 'bg-slate-900 border-x border-slate-800' : 'bg-slate-200 border-x border-slate-300'} hover:bg-indigo-600`}>
-          <div className="w-4 h-8 bg-slate-800/50 rounded-md border border-slate-700/50 flex items-center justify-center group-hover:bg-indigo-700 transition-colors group-hover:scale-110">
-            <GripVertical size={12} className="text-slate-400 group-hover:text-white" />
-          </div>
-        </div>
-
-        {/* Preview Pane */}
+        <div onMouseDown={startResizing} onDoubleClick={() => setSplitPosition(50)} className={`w-1 h-full cursor-col-resize z-[150] flex items-center justify-center transition-all group shrink-0 select-none ${isDark ? 'bg-slate-900 border-x border-slate-800' : 'bg-slate-200 border-x border-slate-300'} hover:bg-indigo-600`}><div className="w-4 h-8 bg-slate-800/50 rounded-md border border-slate-700/50 flex items-center justify-center group-hover:bg-indigo-700 transition-colors group-hover:scale-110"><GripVertical size={12} className="text-slate-400 group-hover:text-white" /></div></div>
         <div style={{ width: `${100 - splitPosition}%` }} className={`h-full flex flex-col relative transition-[width] duration-0 ${paneClasses}`}>
           {isResizing && <div className="absolute inset-0 z-[200] cursor-col-resize" />}
-          
-          <div className={`h-8 px-4 flex items-center justify-between border-b shrink-0 select-none ${isDark ? 'bg-slate-900 border-slate-800' : 'bg-white border-slate-200'}`}>
-             <div className="flex items-center gap-2">
-                <span className="text-[10px] font-black uppercase tracking-widest text-slate-500">Preview</span>
-             </div>
-             <div className="flex items-center gap-1">
-                <PreviewModeButton active={previewMode === 'desktop'} onClick={() => setPreviewMode('desktop')} icon={<Monitor size={12}/>} isDark={isDark} />
-                <PreviewModeButton active={previewMode === 'mobile'} onClick={() => setPreviewMode('mobile')} icon={<Smartphone size={12}/>} isDark={isDark} />
-                <PreviewModeButton active={previewMode === 'email'} onClick={() => setPreviewMode('email')} icon={<Mail size={12}/>} isDark={isDark} />
-             </div>
-          </div>
-          
-          <div className="flex-1 overflow-hidden flex items-center justify-center bg-[#f0f0f0] p-4">
-             <div className={`h-full bg-white shadow-2xl transition-all duration-300 relative overflow-hidden ${
-                previewMode === 'mobile' ? 'max-w-[375px] w-full border-[12px] border-slate-900 rounded-[2.5rem]' :
-                previewMode === 'email' ? 'max-w-[600px] w-full shadow-lg' : 'w-full rounded-md'
-              }`}>
-               {previewMode === 'mobile' && <div className="absolute top-0 left-1/2 -translate-x-1/2 w-24 h-5 bg-slate-900 rounded-b-xl z-10" />}
-               <iframe srcDoc={srcDoc} className="w-full h-full border-none bg-white rounded-inherit" title="Preview" sandbox="allow-scripts allow-popups allow-forms" />
-             </div>
-          </div>
+          <div className={`h-8 px-4 flex items-center justify-between border-b shrink-0 select-none ${isDark ? 'bg-slate-900 border-slate-800' : 'bg-white border-slate-200'}`}><div className="flex items-center gap-2"><span className="text-[10px] font-black uppercase tracking-widest text-slate-500">Preview</span></div><div className="flex items-center gap-1"><PreviewModeButton active={previewMode === 'desktop'} onClick={() => setPreviewMode('desktop')} icon={<Monitor size={12}/>} isDark={isDark} /><PreviewModeButton active={previewMode === 'mobile'} onClick={() => setPreviewMode('mobile')} icon={<Smartphone size={12}/>} isDark={isDark} /><PreviewModeButton active={previewMode === 'email'} onClick={() => setPreviewMode('email')} icon={<Mail size={12}/>} isDark={isDark} /></div></div>
+          <div className="flex-1 overflow-hidden flex items-center justify-center bg-[#f0f0f0] p-4"><div className={`h-full bg-white shadow-2xl transition-all duration-300 relative overflow-hidden ${previewMode === 'mobile' ? 'max-w-[375px] w-full border-[12px] border-slate-900 rounded-[2.5rem]' : previewMode === 'email' ? 'max-w-[600px] w-full shadow-lg' : 'w-full rounded-md'}`}>{previewMode === 'mobile' && <div className="absolute top-0 left-1/2 -translate-x-1/2 w-24 h-5 bg-slate-900 rounded-b-xl z-10" />}<iframe srcDoc={srcDoc} className="w-full h-full border-none bg-white rounded-inherit" title="Preview" sandbox="allow-scripts allow-popups allow-forms" /></div></div>
         </div>
       </div>
-
-      <footer className={`shrink-0 h-6 px-4 flex items-center justify-between text-[9px] font-black uppercase tracking-widest border-t z-[100] select-none ${toolbarClasses}`}>
-        <div className="flex gap-4">
-           <span>Size: {new Blob([code]).size} bytes</span>
-        </div>
-      </footer>
     </div>
   );
 };
 
 const ToolButton: React.FC<{ onClick: () => void; icon: React.ReactNode; label: string; color?: string; isDark: boolean }> = ({ onClick, icon, label, color, isDark }) => (
-  <button onClick={onClick} className={`flex items-center gap-1.5 px-2 py-1 rounded-md text-[10px] font-bold transition-all ${
-      color === 'emerald' ? 'bg-emerald-600 text-white hover:bg-emerald-500 shadow-md' : 
-      isDark ? 'text-slate-400 hover:text-white hover:bg-slate-800' : 'text-slate-600 hover:bg-slate-100'
-    }`}>
-    {icon} {label}
-  </button>
+  <button onClick={onClick} className={`flex items-center gap-1.5 px-2 py-1 rounded-md text-[10px] font-bold transition-all ${color === 'emerald' ? 'bg-emerald-600 text-white hover:bg-emerald-500 shadow-md' : isDark ? 'text-slate-400 hover:text-white hover:bg-slate-800' : 'text-slate-600 hover:bg-slate-100'}`}>{icon} {label}</button>
 );
 
 const DecodeButton: React.FC<{ onClick: () => void; label: string; isDark: boolean; highlight?: boolean }> = ({ onClick, label, isDark, highlight }) => (
-  <button onClick={onClick} className={`px-3 py-1 rounded-md text-[9px] font-black uppercase transition-all ${
-      highlight ? 'text-indigo-400 hover:bg-indigo-500/10' :
-      isDark ? 'text-slate-500 hover:text-slate-200 hover:bg-slate-800' : 'text-slate-500 hover:bg-white'
-    }`}>
-    {label}
-  </button>
+  <button onClick={onClick} className={`px-3 py-1 rounded-md text-[9px] font-black uppercase transition-all ${highlight ? 'text-indigo-400 hover:bg-indigo-500/10' : isDark ? 'text-slate-500 hover:text-slate-200 hover:bg-slate-800' : 'text-slate-500 hover:bg-white'}`}>{label}</button>
 );
 
 const PreviewModeButton: React.FC<{ active: boolean; onClick: () => void; icon: React.ReactNode; isDark: boolean }> = ({ active, onClick, icon, isDark }) => (
-  <button onClick={onClick} className={`p-1.5 rounded transition-all ${
-      active ? (isDark ? 'bg-slate-800 text-indigo-400' : 'bg-slate-100 text-indigo-600') :
-      (isDark ? 'text-slate-600 hover:text-slate-400' : 'text-slate-400 hover:text-slate-600')
-    }`}>
-    {icon}
-  </button>
+  <button onClick={onClick} className={`p-1.5 rounded transition-all ${active ? (isDark ? 'bg-slate-800 text-indigo-400' : 'bg-slate-100 text-indigo-600') : (isDark ? 'text-slate-600 hover:text-slate-400' : 'text-slate-400 hover:text-slate-600')}`}>{icon}</button>
 );
 
 export default EmailMasterTool;

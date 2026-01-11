@@ -1,4 +1,3 @@
-
 export interface DkimResult {
   id: number;
   domain: string;
@@ -111,16 +110,6 @@ export interface IpGeoResult {
 
 export type MimeEncodingType = 'auto' | 'base64' | 'quoted-printable';
 
-export interface SpamCopResult {
-  id: number;
-  ip: string;
-  dnsbl: string;
-  status: 'listed' | 'clean' | 'error' | 'invalid' | 'loading' | 'pending';
-  returnCode: string;
-  meaning: string;
-  ttl: number;
-}
-
 export interface SpamhausResult {
   id: number;
   input: string;
@@ -132,17 +121,18 @@ export interface SpamhausResult {
   releaseDate?: string;
 }
 
-export interface BarracudaResult {
+export type EmailMasterAction = 'optimize' | 'fix' | 'decode' | 'validate' | 'write';
+
+export interface BlacklistAuditEntry {
   id: number;
   input: string;
   type: 'ip' | 'domain';
-  status: 'listed' | 'clean' | 'error' | 'loading' | 'pending';
-  message: string;
-  categories: string[];
+  ptr: string;
+  spamhaus: 'listed' | 'clean' | 'pending' | 'error';
+  status: 'pending' | 'loading' | 'complete' | 'error';
 }
 
-export type EmailMasterAction = 'optimize' | 'fix' | 'decode' | 'validate' | 'write';
-
+// Fixed missing exports required by various forensic tools
 export interface RecordMatchResult {
   id: number;
   domain: string;
@@ -152,6 +142,40 @@ export interface RecordMatchResult {
   status: 'pending' | 'loading' | 'match' | 'mismatch' | 'missing' | 'error';
 }
 
+export interface SpamCopResult {
+  id: number;
+  ip: string;
+  dnsbl: string;
+  status: 'pending' | 'loading' | 'listed' | 'clean' | 'error' | 'invalid';
+  returnCode: string;
+  meaning: string;
+  ttl: number;
+}
+
+export interface BarracudaResult {
+  id: number;
+  input: string;
+  type: 'ip' | 'domain';
+  status: 'pending' | 'loading' | 'listed' | 'clean' | 'error';
+  message: string;
+  categories: string[];
+}
+
+export interface YahooEmail {
+  uid: string;
+  subject: string;
+  fromName: string;
+  fromEmail: string;
+  originIp: string;
+  listUnsubscribe: string;
+  messageId: string;
+  returnPath: string;
+  htmlContent: string;
+  fullSource: string;
+  date: string;
+}
+
+// Fix: Adding missing members for UrlTracerTool and traceService
 export interface UrlTraceHop {
   id: number;
   url: string;
@@ -165,15 +189,4 @@ export interface UrlTraceResult {
   hops: UrlTraceHop[];
   isComplete: boolean;
   error?: string;
-}
-
-export interface BlacklistAuditEntry {
-  id: number;
-  input: string;
-  type: 'ip' | 'domain';
-  ptr: string;
-  spamhaus: 'listed' | 'clean' | 'pending' | 'error';
-  spamcop: 'listed' | 'clean' | 'pending' | 'error' | 'n/a';
-  barracuda: 'listed' | 'clean' | 'pending' | 'error';
-  status: 'pending' | 'loading' | 'complete' | 'error';
 }

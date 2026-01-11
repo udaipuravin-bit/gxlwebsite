@@ -3,8 +3,8 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Bulk Blacklist Checker - Forensic Intelligence</title>
-  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text x='50%25' y='55%25' dominant-baseline='central' text-anchor='middle' font-family='Inter, sans-serif' font-weight='900' font-size='90' fill='%236366f1'>B</text></svg>">
+  <title>Email Sparks - Intelligence Hub</title>
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><path d='M30 50 L55 10 L45 45 L70 45 L45 90 L55 55 Z' fill='%23f97316'/></svg>">
   <script src="https://cdn.tailwindcss.com"></script>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -14,12 +14,12 @@
     body { font-family: 'Inter', sans-serif; transition: background-color 0.3s ease; margin: 0; overflow-x: hidden; }
     ::-webkit-scrollbar { width: 8px; }
     ::-webkit-scrollbar-track { background: transparent; }
-    ::-webkit-scrollbar-thumb { background: rgba(99, 102, 241, 0.2); border-radius: 4px; }
-    ::-webkit-scrollbar-thumb:hover { background: rgba(99, 102, 241, 0.4); }
+    ::-webkit-scrollbar-thumb { background: rgba(249, 115, 22, 0.2); border-radius: 4px; }
+    ::-webkit-scrollbar-thumb:hover { background: rgba(249, 115, 22, 0.4); }
     
     .rich-text-preview img { max-width: 100%; height: auto; }
     .custom-scrollbar::-webkit-scrollbar { width: 6px; }
-    .custom-scrollbar::-webkit-scrollbar-thumb { background-color: rgba(99, 102, 241, 0.2); border-radius: 20px; }
+    .custom-scrollbar::-webkit-scrollbar-thumb { background-color: rgba(249, 115, 22, 0.2); border-radius: 20px; }
     
     .no-scrollbar::-webkit-scrollbar { display: none; }
     .no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
@@ -33,7 +33,6 @@
       font-style: italic;
     }
 
-    /* GLOBAL FIX FOR MONACO EDITOR WIDGETS */
     .monaco-editor .editor-widget {
       z-index: 9999 !important;
       pointer-events: auto !important;
@@ -56,13 +55,16 @@
       cursor: text !important;
     }
 
-    /* Notification Animations */
     @keyframes slideInRight {
       from { transform: translateX(100%); opacity: 0; }
       to { transform: translateX(0); opacity: 1; }
     }
     .animate-notification {
       animation: slideInRight 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+    }
+    
+    .text-glow {
+      text-shadow: 0 0 15px rgba(249, 115, 22, 0.5);
     }
   </style>
 <script type="importmap">
@@ -74,8 +76,7 @@
     "react-dom/client": "https://esm.sh/react-dom@^19.2.3/client",
     "lucide-react": "https://esm.sh/lucide-react@^0.562.0",
     "leaflet": "https://esm.sh/leaflet@1.9.4",
-    "@monaco-editor/react": "https://esm.sh/@monaco-editor/react@4.7.0",
-    "@google/genai": "https://esm.sh/@google/genai@^1.34.0"
+    "@monaco-editor/react": "https://esm.sh/@monaco-editor/react@4.7.0"
   }
 }
 </script>

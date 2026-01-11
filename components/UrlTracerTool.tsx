@@ -134,8 +134,8 @@ const UrlTracerTool: React.FC<UrlTracerToolProps> = ({ onBack, theme }) => {
   };
 
   return (
-    <div className="min-h-screen p-4 md:p-8 flex flex-col gap-8 max-w-7xl mx-auto animate-in fade-in duration-500">
-      <header className={`flex items-center justify-between p-6 rounded-3xl shadow-2xl border ${cardClasses}`}>
+    <div className="min-h-screen px-4 pt-3 pb-8 md:px-8 md:pt-4 md:pb-8 flex flex-col gap-8 max-w-7xl mx-auto animate-in fade-in duration-500">
+      <header className={`flex items-center justify-between p-5 rounded-3xl shadow-2xl border ${cardClasses}`}>
         <div className="flex items-center gap-4">
           <button onClick={onBack} className={`p-2.5 rounded-2xl transition-all border ${isDark ? 'bg-slate-800 border-slate-700 text-slate-400 hover:text-white' : 'bg-slate-100 border-slate-200'}`}>
             <ArrowLeft size={20} />
@@ -145,7 +145,7 @@ const UrlTracerTool: React.FC<UrlTracerToolProps> = ({ onBack, theme }) => {
               <Link2 size={28} />
             </div>
             <div>
-              <h1 className="text-xl md:text-2xl font-black tracking-tight uppercase">URL Redirect Tracer</h1>
+              <h1 className="text-xl md:text-2xl font-black tracking-tight uppercase text-indigo-500">URL Tracer</h1>
               <p className="text-slate-500 text-[10px] font-black uppercase tracking-widest opacity-60">High-Fidelity HTTP Forensic Engine</p>
             </div>
           </div>
@@ -184,22 +184,7 @@ const UrlTracerTool: React.FC<UrlTracerToolProps> = ({ onBack, theme }) => {
                 <h3 className="text-[10px] font-black text-slate-500 uppercase tracking-[0.2em] flex items-center gap-2">
                   <Table size={14} className="text-indigo-400" /> Network Hops Identified
                 </h3>
-                <button onClick={copyResults} className="flex items-center gap-2 text-[10px] font-black uppercase tracking-widest text-indigo-400 hover:text-indigo-300">
-                  <Copy size={12} /> Copy results
-                </button>
               </div>
-
-              {result.error && (
-                <div className="p-6 rounded-2xl bg-rose-500/10 border border-rose-500/20 flex items-start gap-4">
-                   <AlertTriangle className="text-rose-500 shrink-0" size={20} />
-                   <div className="space-y-1">
-                      <p className="text-xs font-black text-rose-500 uppercase tracking-widest">Tracing Failure</p>
-                      <p className="text-[11px] text-slate-400 font-medium">{result.error}</p>
-                      <p className="text-[10px] text-slate-500 font-medium italic mt-2">Possible causes: Target server blocking proxy requests, bot protection (Cloudflare/Akamai), or invalid URL path.</p>
-                   </div>
-                </div>
-              )}
-
               <div className="overflow-x-auto rounded-3xl border border-slate-800/50">
                 <table className="w-full text-left">
                   <thead className={`${isDark ? 'bg-slate-900/50' : 'bg-slate-50'} border-b border-slate-800/50`}>
@@ -241,76 +226,8 @@ const UrlTracerTool: React.FC<UrlTracerToolProps> = ({ onBack, theme }) => {
               </div>
             </div>
           )}
-
-          {!result && !isTracing && (
-            <div className={`p-12 rounded-3xl border border-dashed flex flex-col items-center justify-center gap-4 ${isDark ? 'bg-slate-900/20 border-slate-800' : 'bg-slate-50 border-slate-200'}`}>
-               <Link2 className="text-slate-700 opacity-30" size={64} strokeWidth={1} />
-               <p className="text-[10px] font-black uppercase text-slate-600 tracking-widest text-center">
-                 Awaiting destination for path analysis audit
-               </p>
-            </div>
-          )}
-        </div>
-
-        <div className={`lg:col-span-12 p-8 rounded-[2.5rem] shadow-2xl border ${cardClasses}`}>
-          <div className="flex items-center gap-4 mb-8">
-            <div className="p-2.5 rounded-2xl bg-emerald-500/10 text-emerald-500">
-               <HelpCircle size={24} />
-            </div>
-            <div>
-               <h2 className="text-lg font-black uppercase tracking-tight">HTTP Intelligence Glossary</h2>
-               <p className="text-[10px] font-black uppercase text-slate-500 tracking-widest">RFC Protocol Documentation</p>
-            </div>
-          </div>
-
-          <div className="space-y-4">
-            {CHEAT_SHEET_DATA.map((section) => (
-              <div key={section.range} className={`rounded-3xl border overflow-hidden transition-all ${isDark ? 'bg-slate-950/50 border-slate-800' : 'bg-slate-50 border-slate-200'}`}>
-                <button 
-                  onClick={() => setOpenSection(openSection === section.range ? null : section.range)}
-                  className="w-full flex items-center justify-between p-6 hover:bg-white/5 transition-all text-left"
-                >
-                  <div className="flex items-center gap-4">
-                     <span className={`px-2 py-0.5 rounded-lg text-[10px] font-black border uppercase tracking-widest ${getStatusColor(section.range as any)}`}>
-                        {section.range}
-                     </span>
-                     <div>
-                        <h3 className="text-sm font-black uppercase tracking-tight">{section.title}</h3>
-                        <p className="text-[10px] text-slate-500 font-bold uppercase tracking-widest">{section.desc}</p>
-                     </div>
-                  </div>
-                  {openSection === section.range ? <ChevronUp size={18} /> : <ChevronDown size={18} />}
-                </button>
-                
-                {openSection === section.range && (
-                  <div className="p-6 pt-0 grid grid-cols-1 md:grid-cols-2 gap-4 animate-in slide-in-from-top-2">
-                    {section.codes.map((item) => (
-                      <div key={item.code} className={`p-5 rounded-2xl border ${isDark ? 'bg-slate-900 border-slate-800/50' : 'bg-white border-slate-100'}`}>
-                        <div className="flex items-center gap-3 mb-2">
-                           <span className="text-sm font-black text-indigo-500">{item.code}</span>
-                           <span className="text-xs font-black uppercase tracking-tight">{item.title}</span>
-                        </div>
-                        <p className="text-xs text-slate-500 font-medium leading-relaxed mb-3">{item.text}</p>
-                        <div className={`p-3 rounded-xl ${isDark ? 'bg-slate-950/50' : 'bg-slate-50'}`}>
-                           <p className="text-[9px] font-black uppercase text-slate-600 tracking-widest mb-1">Use Case</p>
-                           <p className="text-[10px] font-bold text-indigo-400/80 italic">{item.useCase}</p>
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                )}
-              </div>
-            ))}
-          </div>
         </div>
       </div>
-
-      <footer className={`mt-auto pt-8 border-t flex justify-between items-center text-[10px] font-black text-slate-600 uppercase tracking-widest ${isDark ? 'border-slate-800' : 'border-slate-200'}`}>
-        <p>&copy; {new Date().getFullYear()} Authenticator Pro • Forensic Lab v4.1</p>
-        <div className="flex gap-4">
-           <span className="flex items-center gap-1.5 text-indigo-500 font-black"><ShieldCheck size={12}/> AllOrigins Stability Engine</span>
-        </div>
-      </footer>
     </div>
   );
 };

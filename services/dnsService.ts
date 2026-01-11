@@ -1,3 +1,4 @@
+
 import { DnsResponse, DnsLookupEntry, MxRecord, WhoisResult, PtrResult, CaaRecord } from '../types';
 
 const RECORD_TYPE_MAP: Record<string, number> = {
@@ -12,21 +13,12 @@ const RECORD_TYPE_MAP: Record<string, number> = {
   'CAA': 257
 };
 
-// Internal DQS Master Key
 const DQS_INTERNAL_KEY = 'cnrmf6qnuzmpx57lve7mtvhr2q';
-
-// Backend PHP API Base URL - RESERVED FOR SPAMHAUS FORENSIC ONLY
 const PHP_API_URL = 'https://shadow-7dfgdfx.serv00.net/ipchecker';
 
-/**
- * Token Caching Mechanism
- */
 let cachedToken: string | null = null;
 let tokenExpiry: number = 0;
 
-/**
- * Fetches or returns a cached Spamhaus API Token
- */
 const getSpamhausToken = async (): Promise<string | null> => {
   const now = Date.now();
   if (cachedToken && now < tokenExpiry) return cachedToken;
@@ -47,12 +39,8 @@ const getSpamhausToken = async (): Promise<string | null> => {
   }
 };
 
-/**
- * Format Date exactly as per user screenshot: Sat, 10 Jan, 2026, 2:32 pm IST
- */
 const formatDate = (unix: number): string => {
   const d = new Date(unix * 1000);
-  
   const options: Intl.DateTimeFormatOptions = {
     weekday: 'short',
     day: '2-digit',
@@ -63,26 +51,12 @@ const formatDate = (unix: number): string => {
     hour12: true,
     timeZone: 'Asia/Kolkata'
   };
-
   const formatter = new Intl.DateTimeFormat('en-GB', options);
   const parts = formatter.formatToParts(d);
   const findPart = (type: string) => parts.find(p => p.type === type)?.value || '';
-
-  const weekday = findPart('weekday');
-  const day = findPart('day');
-  const month = findPart('month');
-  const year = findPart('year');
-  const hour = findPart('hour');
-  const minute = findPart('minute');
-  const ampm = (parts.find(p => p.type === 'dayPeriod')?.value || '').toLowerCase();
-
-  // Exactly matching screenshot format: "Sat, 10 Jan, 2026, 2:32 pm IST"
-  return `${weekday}, ${day} ${month}, ${year}, ${hour}:${minute} ${ampm} IST`;
+  return `${findPart('weekday')}, ${findPart('day')} ${findPart('month')}, ${findPart('year')}, ${findPart('hour')}:${findPart('minute')} ${(parts.find(p => p.type === 'dayPeriod')?.value || '').toLowerCase()} IST`;
 };
 
-/**
- * DNSBL Reputation Logic
- */
 export const lookupSpamhausReputation = async (target: string, type: 'ip' | 'domain') => {
   const zones = type === 'ip' ? [{ name: 'ZEN', host: 'zen.dq.spamhaus.net' }] : [{ name: 'DBL', host: 'dbl.dq.spamhaus.net' }];
   const results = [];
@@ -148,13 +122,9 @@ const getSpamhausReason = (code: string, dataset: string): string => {
   return 'Listed (DBL)';
 };
 
-/**
- * IP History: Returns ALL XBL/CSS entries found in the timeline.
- */
 export const getIPReleaseDate = async (ip: string): Promise<{ text: string, data: any }> => {
   const token = await getSpamhausToken();
   if (!token) return { text: '<span class="text-rose-500 opacity-60">Auth failed</span>', data: null };
-
   try {
     const res = await fetch(`${PHP_API_URL}/spamhaus-history.php`, {
       method: 'POST',
@@ -162,27 +132,19 @@ export const getIPReleaseDate = async (ip: string): Promise<{ text: string, data
       body: JSON.stringify({ ip, token })
     });
     const data = await res.json();
-    
     const results = Array.isArray(data) ? data : (data.results && Array.isArray(data.results) ? data.results : []);
-
     if (results.length > 0) {
       const validEntries = results.filter((e: any) => {
         const ds = (e.dataset || '').toUpperCase();
         return ds.includes('XBL') || ds.includes('CSS');
       });
-
       if (validEntries.length === 0) return { text: '—', data: null };
-
       const prioritized = validEntries.sort((a: any, b: any) => {
         if (a.dataset.toUpperCase().includes('XBL')) return -1;
         if (b.dataset.toUpperCase().includes('XBL')) return 1;
         return 0;
       });
-
-      const html = prioritized.map((entry: any) => {
-        return `<div class="mb-1 last:mb-0"><strong class="text-rose-500">${entry.dataset.toUpperCase()}</strong> : ${formatDate(entry.valid_until)}</div>`;
-      }).join('');
-
+      const html = prioritized.map((entry: any) => `<div class="mb-1 last:mb-0"><strong class="text-rose-500">${entry.dataset.toUpperCase()}</strong> : ${formatDate(entry.valid_until)}</div>`).join('');
       return { text: html, data: prioritized };
     }
     return { text: '—', data: null };
@@ -191,13 +153,9 @@ export const getIPReleaseDate = async (ip: string): Promise<{ text: string, data
   }
 };
 
-/**
- * Domain History for DBL Dataset
- */
 export const getDomainReleaseDate = async (domain: string): Promise<{ text: string, data: any }> => {
   const token = await getSpamhausToken();
   if (!token) return { text: '<span class="text-rose-500 opacity-60">Auth failed</span>', data: null };
-
   try {
     const res = await fetch(`${PHP_API_URL}/spamhaus-domain-history.php`, {
       method: 'POST',
@@ -205,24 +163,37 @@ export const getDomainReleaseDate = async (domain: string): Promise<{ text: stri
       body: JSON.stringify({ domain, token })
     });
     const data = await res.json();
-    
     const results = Array.isArray(data) ? data : (data.results && Array.isArray(data.results) ? data.results : []);
     const timestamp = data['listed-until'] || (results[0] ? (results[0].valid_until || results[0]['listed-until']) : null);
-    
     if (timestamp) {
       const html = `<div><strong class="text-rose-500">DBL</strong> : ${formatDate(timestamp)}</div>`;
       return { text: html, data };
     }
-    
     return { text: '—', data: null };
   } catch (e) {
     return { text: '<span class="text-rose-500 opacity-40">Fetch Error</span>', data: null };
   }
 };
 
-/**
- * Generic DNS Resolver
- */
+const identifyProvider = (exchange: string): string => {
+  const host = exchange.toLowerCase();
+  if (host.includes('google.com') || host.includes('googlemail.com')) return 'Google Workspace';
+  if (host.includes('outlook.com') || host.includes('messaging.microsoft.com') || host.includes('onmicrosoft.com')) return 'Microsoft 365 / Outlook';
+  if (host.includes('zoho.com')) return 'Zoho Mail';
+  if (host.includes('pphosted.com')) return 'Proofpoint';
+  if (host.includes('mimecast.com')) return 'Mimecast';
+  if (host.includes('secureserver.net')) return 'GoDaddy / WildWest';
+  if (host.includes('barracudanetworks.com')) return 'Barracuda';
+  if (host.includes('mail.yahoo.com')) return 'Yahoo Mail';
+  if (host.includes('icloud.com')) return 'Apple iCloud';
+  if (host.includes('register.com')) return 'Register.com';
+  if (host.includes('yandex.net')) return 'Yandex Mail';
+  if (host.includes('amazon.com')) return 'Amazon SES';
+  if (host.includes('sendgrid.net')) return 'Twilio SendGrid';
+  if (host.includes('protection.outlook.com')) return 'Microsoft 365 Defender';
+  return 'Private / Custom';
+};
+
 export const lookupRecordByType = async (domain: string, type: string): Promise<DnsLookupEntry[]> => {
   const typeNum = RECORD_TYPE_MAP[type.toUpperCase()] || 1;
   const url = `https://dns.google/resolve?name=${domain}&type=${typeNum}`;
@@ -243,9 +214,6 @@ export const lookupRecordByType = async (domain: string, type: string): Promise<
   }
 };
 
-/**
- * Standard Lookups
- */
 export const lookupDkimRecord = async (domain: string, selector: string): Promise<string | null> => {
   const records = await lookupRecordByType(`${selector}._domainkey.${domain}`, 'TXT');
   return records.length > 0 ? records[0].value.replace(/"/g, '') : null;
@@ -276,7 +244,12 @@ export const lookupMxRecords = async (domain: string): Promise<MxRecord[]> => {
   const records = await lookupRecordByType(domain, 'MX');
   return records.map(r => {
     const parts = r.value.split(' ');
-    return { priority: parseInt(parts[0]), exchange: parts[1].replace(/\.$/, ''), provider: 'Detected' };
+    const exchange = parts[1].replace(/\.$/, '');
+    return { 
+      priority: parseInt(parts[0]), 
+      exchange, 
+      provider: identifyProvider(exchange) 
+    };
   }).sort((a, b) => a.priority - b.priority);
 };
 
@@ -286,34 +259,21 @@ export const lookupPtrRecord = async (ip: string): Promise<string | null> => {
   return records.length > 0 ? records[0].value.replace(/\.$/, '') : null;
 };
 
-/**
- * WHOIS Lookup using public RDAP API (Standard compliant)
- */
 export const lookupWhoisData = async (domain: string): Promise<Partial<WhoisResult> | null> => {
   try {
     const response = await fetch(`https://rdap.org/domain/${domain}`);
     if (!response.ok) return null;
     const data = await response.json();
-    
-    const createdEvent = (data.events || []).find((e: any) => e.eventAction === 'registration');
     const expiryEvent = (data.events || []).find((e: any) => e.eventAction === 'expiration');
-    
     const expiryDate = expiryEvent ? expiryEvent.eventDate : '';
     let daysRemaining = 0;
     if (expiryDate) {
       const expiry = new Date(expiryDate);
       daysRemaining = Math.ceil((expiry.getTime() - new Date().getTime()) / (1000 * 60 * 60 * 24));
     }
-    
     const registrarEntity = (data.entities || []).find((e: any) => e.roles?.includes('registrar'));
     const registrar = registrarEntity?.vcardArray?.[1]?.find((v: any) => v[0] === 'fn')?.[3] || 'Unknown';
-    
-    return {
-      registrar,
-      expiryDate,
-      daysRemaining,
-      status: data.status || []
-    };
+    return { registrar, expiryDate, daysRemaining, status: data.status || [] };
   } catch (error) {
     return null;
   }

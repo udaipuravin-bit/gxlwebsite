@@ -1,19 +1,23 @@
-import React, { useState, useEffect, useCallback, useRef } from 'react';
+import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { 
   ArrowLeft, 
   Scissors, 
   Copy, 
   Check, 
   RotateCcw, 
-  ChevronDown, 
-  ChevronUp, 
-  Layout, 
-  Code2, 
   Eye, 
   GripVertical,
-  FileCode,
   ShieldCheck,
-  Zap
+  Zap,
+  Trash2,
+  ChevronDown,
+  FileCode,
+  Globe,
+  Database,
+  Terminal,
+  Activity,
+  Maximize2,
+  Code
 } from 'lucide-react';
 import { useNotify } from '../App';
 
@@ -22,25 +26,21 @@ interface HtmlCleanerToolProps {
   theme: 'dark' | 'light';
 }
 
-interface CleanerOptions {
-  removeImgSrc: boolean;
-  removeImgSrcset: boolean;
-  removeImgAlt: boolean;
-  removeAHref: boolean;
-  removeCssUrl: boolean;
-  replaceColors: boolean;
-  replaceBgAttrs: boolean;
-  removeText: boolean;
-  preserveComments: boolean;
-  normalizeBorders: boolean;
-  removeInlineBg: boolean;
+interface FilterRules {
+  imgSrc: boolean;
+  href: boolean;
+  cssUrl: boolean;
+  colors: boolean;
+  bgAttrs: boolean;
+  text: boolean;
+  comments: boolean;
+  borders: boolean;
 }
 
 interface ForensicReport {
-  imgSrc: string[];
-  imgSrcset: string[];
-  aHref: string[];
-  cssUrls: string[];
+  images: string[];
+  links: string[];
+  cssAssets: string[];
   colors: string[];
 }
 
@@ -49,378 +49,254 @@ const HtmlCleanerTool: React.FC<HtmlCleanerToolProps> = ({ onBack, theme }) => {
   const isDark = theme === 'dark';
 
   const [inputHtml, setInputHtml] = useState('');
-  const [cleanedHtml, setCleanedHtml] = useState('');
-  const [report, setReport] = useState<ForensicReport>({ imgSrc: [], imgSrcset: [], aHref: [], cssUrls: [], colors: [] });
-  const [options, setOptions] = useState<CleanerOptions>({
-    removeImgSrc: true,
-    removeImgSrcset: true,
-    removeImgAlt: true,
-    removeAHref: true,
-    removeCssUrl: true,
-    replaceColors: true,
-    replaceBgAttrs: true,
-    removeText: true,
-    preserveComments: true,
-    normalizeBorders: true,
-    removeInlineBg: true,
+  const [sanitizedHtml, setSanitizedHtml] = useState('');
+  const [isCopied, setIsCopied] = useState(false);
+  
+  const [rules, setRules] = useState<FilterRules>({
+    imgSrc: true,
+    href: true,
+    cssUrl: true,
+    colors: true,
+    bgAttrs: true,
+    text: false,
+    comments: true,
+    borders: true,
   });
 
-  const [splitA, setSplitA] = useState(33.33);
-  const [splitB, setSplitB] = useState(33.33);
-  const [isResizingA, setIsResizingA] = useState(false);
-  const [isResizingB, setIsResizingB] = useState(false);
-  const [isCopied, setIsCopied] = useState(false);
-  const [openReportSections, setOpenReportSections] = useState<string[]>([]);
-
-  const containerRef = useRef<HTMLDivElement>(null);
-
-  const toggleOption = (key: keyof CleanerOptions) => {
-    setOptions(prev => ({ ...prev, [key]: !prev[key] }));
+  const toggleRule = (key: keyof FilterRules) => {
+    setRules(prev => ({ ...prev, [key]: !prev[key] }));
   };
 
-  const toggleReportSection = (section: string) => {
-    setOpenReportSections(prev => 
-      prev.includes(section) ? prev.filter(s => s !== section) : [...prev, section]
-    );
-  };
+  const forensicReport = useMemo<ForensicReport>(() => {
+    if (!inputHtml) return { images: [], links: [], cssAssets: [], colors: [] };
+
+    const images = Array.from(inputHtml.matchAll(/src="([^"]+)"/gi)).map(m => m[1]);
+    const links = Array.from(inputHtml.matchAll(/href="([^"]+)"/gi)).map(m => m[1]);
+    const cssAssets = Array.from(inputHtml.matchAll(/url\(['"]?([^'"]+)['"]?\)/gi)).map(m => m[1]);
+    const colors = Array.from(inputHtml.matchAll(/#[0-9a-fA-F]{3,6}|rgba?\([^)]+\)/gi)).map(m => m[0]);
+
+    return {
+      images: Array.from(new Set(images)),
+      links: Array.from(new Set(links)),
+      cssAssets: Array.from(new Set(cssAssets)),
+      colors: Array.from(new Set(colors)),
+    };
+  }, [inputHtml]);
 
   const processHtml = useCallback(() => {
     if (!inputHtml.trim()) {
-      setCleanedHtml('');
-      setReport({ imgSrc: [], imgSrcset: [], aHref: [], cssUrls: [], colors: [] });
+      setSanitizedHtml('');
       return;
     }
 
     let result = inputHtml;
-    const newReport: ForensicReport = { imgSrc: [], imgSrcset: [], aHref: [], cssUrls: [], colors: [] };
 
-    // Forensic Extraction (Before Cleaning)
-    const extract = (regex: RegExp, list: string[]) => {
-      let match;
-      while ((match = regex.exec(inputHtml)) !== null) {
-        if (match[1] && !list.includes(match[1])) list.push(match[1]);
-      }
-    };
-
-    extract(/src=["'](.*?)["']/gi, newReport.imgSrc);
-    extract(/srcset=["'](.*?)["']/gi, newReport.imgSrcset);
-    extract(/href=["'](.*?)["']/gi, newReport.aHref);
-    extract(/url\(['"]?(.*?)['"]?\)/gi, newReport.cssUrls);
-    const hexMatches = inputHtml.match(/#(?:[0-9a-fA-F]{3}){1,2}/g) || [];
-    newReport.colors = Array.from(new Set(hexMatches));
-
-    // CLEANING LOGIC (Matching User Prototype Patterns)
-    
-    // 1. Handle Comments (Placeholder Strategy)
-    const comments: string[] = [];
-    if (options.preserveComments) {
-      result = result.replace(/<!--[\s\S]*?-->/g, (comment) => {
-        comments.push(comment);
-        return `<!--COMMENT_PLACEHOLDER_${comments.length - 1}-->`;
-      });
-    } else {
+    if (rules.comments) {
       result = result.replace(/<!--[\s\S]*?-->/g, '');
     }
-
-    // 2. Text Content Removal (Character to Space Masking)
-    if (options.removeText) {
-      const tags = ['p', 'a', 'span', 'div', 'strong', 'h1', 'h2', 'h3', 'h4', 'h5', 'h6', 'td'];
-      const textRegex = new RegExp(`(<(${tags.join('|')})(\\s[^>]*)?>)([\\s\\S]*?)(</\\2>)`, 'gi');
-      result = result.replace(textRegex, (match, p1, p2, p3, p4, p5) => {
-        // Replace non-whitespace with spaces to preserve layout flow
-        const innerContentRemoved = p4.replace(/([^<>]*)(?=<|$)/g, (text: string) => text.replace(/\S/g, ' '));
-        return `${p1}${innerContentRemoved}${p5}`;
-      });
+    if (rules.href) {
+      result = result.replace(/(<a\s+[^>]*href=")[^"]*("[^>]*>)/gi, '$1#$2');
     }
-
-    // 3. Attribute Value Sanitization (Quoted & Unquoted)
-    if (options.removeAHref) {
-      result = result.replace(/(<a\s+[^>]*href=")[^"]*("[^>]*>)/gi, '$1""$2');
-      result = result.replace(/(<a\s+[^>]*href=)[^\s>]+([^>]*>)/gi, '$1""$2');
+    if (rules.imgSrc) {
+      result = result.replace(/(<img\s+[^>]*src=")[^"]*("[^>]*>)/gi, '$1https://via.placeholder.com/1x1/cccccc/cccccc.png$2');
+      result = result.replace(/\s+srcset="[^"]*"/gi, '');
     }
-
-    if (options.removeImgSrc) {
-      result = result.replace(/(<img\s+[^>]*src=")[^"]*("[^>]*>)/gi, '$1""$2');
-      result = result.replace(/(<img\s+[^>]*src=)[^\s>]+([^>]*>)/gi, '$1""$2');
-    }
-
-    if (options.removeImgSrcset) {
-      result = result.replace(/(<img\s+[^>]*srcset=")[^"]*("[^>]*>)/gi, '$1""$2');
-      result = result.replace(/(<img\s+[^>]*srcset=)[^\s>]+([^>]*>)/gi, '$1""$2');
-    }
-
-    if (options.removeImgAlt) {
-      result = result.replace(/(<img\s+[^>]*alt=")[^"]*("[^>]*>)/gi, '$1$2');
-    }
-
-    // 4. Color & Background Normalization
-    if (options.replaceColors) {
-      result = result.replace(/color\s*:\s*#[0-9a-fA-F]{3,6}\s*;?/gi, 'color:#ffffff;');
-    }
-
-    if (options.replaceBgAttrs) {
-      result = result.replace(/background-color\s*:\s*#[0-9a-fA-F]{3,6}\s*;?/gi, 'background-color:#ffffff;');
-      result = result.replace(/bgcolor\s*=\s*"?#[0-9a-fA-F]{3,6}"?/gi, 'bgcolor="#ffffff"');
-      result = result.replace(/background\s*:\s*#[0-9a-fA-F]{3,6}\s*;?/gi, 'background:#ffffff;');
-    }
-
-    // 5. Border Normalization
-    if (options.normalizeBorders) {
-      result = result.replace(/(solid\s*\d+px\s*)#[0-9a-fA-F]{3,6}/gi, '$1#ffffff');
-      result = result.replace(/(\d+px\s+solid\s*)#[0-9a-fA-F]{3,6}/gi, '$1#ffffff');
-    }
-
-    // 6. CSS URL & Background Image Removal
-    if (options.removeCssUrl) {
+    if (rules.cssUrl) {
       result = result.replace(/url\s*\(\s*['"]?[^'"]*['"]?\s*\)/gi, "url('')");
     }
-
-    if (options.removeInlineBg) {
-      result = result.replace(/(background\s*=\s*")[^"]*("\s*style="[^"]*background-[^"]*";?)/gi, '$1$2');
-      result = result.replace(/background-image\s*:\s*url\s*\(\s*['"]?[^'"]*['"]?\s*\)\s*;?/gi, 'background-image:none;');
+    if (rules.bgAttrs) {
+      result = result.replace(/\s+bgcolor="[^"]*"/gi, '');
+      result = result.replace(/\s+background="[^"]*"/gi, '');
     }
-
-    // 7. Restore Comments
-    if (options.preserveComments) {
-      result = result.replace(/<!--COMMENT_PLACEHOLDER_(\d+)-->/g, (_, index) => {
-        return comments[parseInt(index)] || '';
+    if (rules.colors) {
+      result = result.replace(/color\s*:\s*#[0-9a-fA-F]{3,6}\s*;?/gi, 'color:inherit;');
+      result = result.replace(/background-color\s*:\s*#[0-9a-fA-F]{3,6}\s*;?/gi, 'background-color:transparent;');
+    }
+    if (rules.borders) {
+      result = result.replace(/\s+border="[^"]*"/gi, ' border="0"');
+      result = result.replace(/border\s*:\s*[^;]+;?/gi, 'border:none;');
+    }
+    if (rules.text) {
+      result = result.replace(/>([^<]+)</g, (match, text) => {
+        if (!text.trim()) return match;
+        return `>[...] <`;
       });
     }
 
-    setCleanedHtml(result);
-    setReport(newReport);
-  }, [inputHtml, options]);
+    setSanitizedHtml(result);
+  }, [inputHtml, rules]);
 
   useEffect(() => {
-    processHtml();
-  }, [inputHtml, options, processHtml]);
+    const timer = setTimeout(processHtml, 150);
+    return () => clearTimeout(timer);
+  }, [inputHtml, rules, processHtml]);
 
-  const handleResize = useCallback((e: MouseEvent) => {
-    if (!containerRef.current) return;
-    const rect = containerRef.current.getBoundingClientRect();
-    const x = e.clientX - rect.left;
-    const percentage = (x / rect.width) * 100;
-
-    if (isResizingA) {
-      setSplitA(Math.max(10, Math.min(percentage, 80)));
-    } else if (isResizingB) {
-      setSplitB(Math.max(10, Math.min(percentage - splitA, 80)));
-    }
-  }, [isResizingA, isResizingB, splitA]);
-
-  useEffect(() => {
-    if (isResizingA || isResizingB) {
-      window.addEventListener('mousemove', handleResize);
-      window.addEventListener('mouseup', () => { setIsResizingA(false); setIsResizingB(false); });
-    }
-    return () => {
-      window.removeEventListener('mousemove', handleResize);
-    };
-  }, [isResizingA, isResizingB, handleResize]);
-
-  const copyCleaned = () => {
-    navigator.clipboard.writeText(cleanedHtml);
+  const handleCopy = () => {
+    if (!sanitizedHtml) return;
+    navigator.clipboard.writeText(sanitizedHtml);
     setIsCopied(true);
     setTimeout(() => setIsCopied(false), 2000);
-    notify('success', 'Sanitized HTML copied.');
+    notify('success', 'Forensic markup copied.');
   };
 
-  const cardClasses = isDark ? 'bg-[#0a0f18] border-[#1e293b] text-slate-100' : 'bg-white border-slate-200 text-slate-900';
+  const bgClass = isDark ? 'bg-[#050812]' : 'bg-slate-50';
+  const panelHeaderClass = isDark ? 'bg-[#0a0f1c] border-b border-slate-800/50' : 'bg-slate-100 border-b border-slate-200';
 
   return (
-    <div className="h-screen flex flex-col gap-0 overflow-hidden">
-      <header className={`shrink-0 flex items-center justify-between px-6 py-3 border-b ${cardClasses} z-50 shadow-sm`}>
+    <div className={`min-h-screen flex flex-col ${bgClass} animate-in fade-in duration-500`}>
+      {/* Header */}
+      <header className="bg-[#0f172a] border-b border-indigo-500/20 px-4 py-3 flex items-center justify-between z-[100] shadow-2xl">
         <div className="flex items-center gap-4">
-          <button onClick={onBack} className={`p-2 rounded-xl transition-all border ${isDark ? 'bg-slate-800 border-slate-700 text-slate-400' : 'bg-slate-100 border-slate-200'}`}>
+          <button onClick={onBack} className="p-2 text-slate-400 hover:text-white bg-slate-800/50 rounded-lg transition-colors">
             <ArrowLeft size={18} />
           </button>
           <div className="flex items-center gap-3">
             <div className="bg-indigo-600 p-1.5 rounded-lg text-white">
-              <Scissors size={20} />
+              <Scissors size={18} />
             </div>
-            <div>
-              <h1 className="text-sm font-black uppercase tracking-widest">HTML Forensic Cleaner</h1>
-            </div>
+            <h1 className="text-sm font-black uppercase tracking-[0.1em] text-white">HTML Forensic Cleaner</h1>
           </div>
         </div>
-
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-3">
           <button onClick={() => setInputHtml('')} className="p-2 text-slate-500 hover:text-rose-400 transition-colors">
             <RotateCcw size={18} />
           </button>
-          <button onClick={copyCleaned} className={`flex items-center gap-2 px-4 py-2 rounded-lg text-[10px] font-black uppercase tracking-widest transition-all ${isCopied ? 'bg-emerald-600 text-white' : 'bg-indigo-600 text-white hover:bg-indigo-500'}`}>
-            {isCopied ? <Check size={14} /> : <Copy size={14} />} {isCopied ? 'Copied' : 'Copy Result'}
+          <button 
+            onClick={handleCopy} 
+            disabled={!sanitizedHtml}
+            className={`flex items-center gap-2 px-6 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all ${isCopied ? 'bg-emerald-600 text-white' : 'bg-indigo-600 text-white hover:bg-indigo-500 shadow-lg shadow-indigo-600/20 disabled:opacity-50'}`}
+          >
+            {isCopied ? <Check size={14} /> : <Copy size={14} />} {isCopied ? 'COPIED' : 'COPY RESULT'}
           </button>
         </div>
       </header>
 
-      <div className="flex-1 flex flex-col min-h-0">
-        {/* Sticky Filter Panel */}
-        <div className={`shrink-0 px-6 py-2 border-b flex items-center gap-6 overflow-x-auto no-scrollbar ${isDark ? 'bg-[#0f172a] border-[#1e293b]' : 'bg-slate-50 border-slate-200'}`}>
-          <div className="flex items-center gap-4">
-             <span className="text-[9px] font-black text-slate-500 uppercase tracking-widest whitespace-nowrap">Filter Rules:</span>
-             <div className="flex gap-4">
-                <CleanerToggle label="IMG SRC" checked={options.removeImgSrc} onChange={() => toggleOption('removeImgSrc')} />
-                <CleanerToggle label="HREF" checked={options.removeAHref} onChange={() => toggleOption('removeAHref')} />
-                <CleanerToggle label="CSS URL" checked={options.removeCssUrl} onChange={() => toggleOption('removeCssUrl')} />
-                <CleanerToggle label="COLORS" checked={options.replaceColors} onChange={() => toggleOption('replaceColors')} />
-                <CleanerToggle label="BG ATTRS" checked={options.replaceBgAttrs} onChange={() => toggleOption('replaceBgAttrs')} />
-                <CleanerToggle label="TEXT" checked={options.removeText} onChange={() => toggleOption('removeText')} />
-                <CleanerToggle label="COMMENTS" checked={options.preserveComments} onChange={() => toggleOption('preserveComments')} />
-                <CleanerToggle label="BORDERS" checked={options.normalizeBorders} onChange={() => toggleOption('normalizeBorders')} />
-             </div>
-          </div>
-        </div>
-
-        {/* Resizable 3-Column Workspace */}
-        <div ref={containerRef} className="flex-1 flex min-h-0 relative select-none">
-          {/* Panel 1: Source */}
-          <div style={{ width: `${splitA}%` }} className="h-full flex flex-col border-r border-slate-800/50">
-             <div className="px-4 py-1.5 bg-slate-900/50 border-b border-slate-800 text-[10px] font-black text-slate-500 uppercase tracking-widest flex items-center justify-between">
-                <span className="flex items-center gap-2"><FileCode size={12} className="text-indigo-400" /> Source HTML</span>
-             </div>
-             <textarea 
-              value={inputHtml}
-              onChange={(e) => setInputHtml(e.target.value)}
-              className="flex-1 w-full bg-slate-950 p-4 outline-none font-mono text-[11px] text-slate-300 resize-none custom-scrollbar"
-              placeholder="<!-- Paste your HTML tracking code here -->"
-             />
-          </div>
-
-          <div onMouseDown={() => setIsResizingA(true)} className="w-1 h-full cursor-col-resize bg-slate-800 hover:bg-indigo-600 transition-colors z-10 flex items-center justify-center">
-             <GripVertical size={10} className="text-slate-600" />
-          </div>
-
-          {/* Panel 2: Cleaned */}
-          <div style={{ width: `${splitB}%` }} className="h-full flex flex-col border-r border-slate-800/50">
-            <div className="px-4 py-1.5 bg-slate-900/50 border-b border-slate-800 text-[10px] font-black text-slate-500 uppercase tracking-widest flex items-center justify-between">
-              <span className="flex items-center gap-2"><Code2 size={12} className="text-emerald-400" /> Sanitized Markup</span>
-            </div>
-            <textarea 
-              readOnly
-              value={cleanedHtml}
-              className="flex-1 w-full bg-slate-900/40 p-4 outline-none font-mono text-[11px] text-emerald-400/80 resize-none custom-scrollbar"
-            />
-          </div>
-
-          <div onMouseDown={() => setIsResizingB(true)} className="w-1 h-full cursor-col-resize bg-slate-800 hover:bg-indigo-600 transition-colors z-10 flex items-center justify-center">
-             <GripVertical size={10} className="text-slate-600" />
-          </div>
-
-          {/* Panel 3: Preview */}
-          <div className="flex-1 h-full flex flex-col bg-white">
-            <div className="px-4 py-1.5 bg-slate-100 border-b border-slate-200 text-[10px] font-black text-slate-500 uppercase tracking-widest flex items-center justify-between">
-              <span className="flex items-center gap-2 text-slate-600"><Eye size={12} /> Visual Audit</span>
-            </div>
-            <div className="flex-1 overflow-hidden relative">
-               <iframe 
-                srcDoc={cleanedHtml}
-                className="w-full h-full border-none pointer-events-none"
-                title="Sanitized Preview"
-               />
-            </div>
-          </div>
-        </div>
-
-        {/* Forensic Report Section (Accordion) */}
-        <div className={`shrink-0 max-h-64 overflow-y-auto border-t custom-scrollbar ${isDark ? 'bg-[#05080f] border-slate-800' : 'bg-slate-50 border-slate-200'}`}>
-           <div className="px-6 py-4">
-              <div className="flex items-center justify-between mb-6">
-                 <div className="flex items-center gap-3">
-                    <div className="p-2 rounded-lg bg-indigo-500/10 text-indigo-400">
-                       <Layout size={18} />
-                    </div>
-                    <h3 className="text-xs font-black uppercase tracking-widest">Extracted Forensic Report</h3>
-                 </div>
-              </div>
-
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-                 <ReportItem 
-                    title="Image Sources" 
-                    count={report.imgSrc.length} 
-                    items={report.imgSrc} 
-                    isOpen={openReportSections.includes('img')} 
-                    onToggle={() => toggleReportSection('img')} 
-                    isDark={isDark}
-                 />
-                 <ReportItem 
-                    title="Anchor Hrefs" 
-                    count={report.aHref.length} 
-                    items={report.aHref} 
-                    isOpen={openReportSections.includes('href')} 
-                    onToggle={() => toggleReportSection('href')} 
-                    isDark={isDark}
-                 />
-                 <ReportItem 
-                    title="CSS Assets" 
-                    count={report.cssUrls.length} 
-                    items={report.cssUrls} 
-                    isOpen={openReportSections.includes('css')} 
-                    onToggle={() => toggleReportSection('css')} 
-                    isDark={isDark}
-                 />
-                 <ReportItem 
-                    title="Colors Replaced" 
-                    count={report.colors.length} 
-                    items={report.colors} 
-                    isOpen={openReportSections.includes('colors')} 
-                    onToggle={() => toggleReportSection('colors')} 
-                    isDark={isDark}
-                 />
-              </div>
-           </div>
+      {/* Rules Bar */}
+      <div className="bg-[#050812] border-b border-slate-800/50 px-6 py-3 flex items-center gap-6 overflow-x-auto no-scrollbar">
+        <span className="text-[9px] font-black uppercase tracking-[0.2em] text-slate-500 shrink-0">Filter Rules:</span>
+        <div className="flex items-center gap-4">
+          <RuleCheckbox label="IMG SRC" checked={rules.imgSrc} onChange={() => toggleRule('imgSrc')} />
+          <RuleCheckbox label="HREF" checked={rules.href} onChange={() => toggleRule('href')} />
+          <RuleCheckbox label="CSS URL" checked={rules.cssUrl} onChange={() => toggleRule('cssUrl')} />
+          <RuleCheckbox label="COLORS" checked={rules.colors} onChange={() => toggleRule('colors')} />
+          <RuleCheckbox label="BG ATTRS" checked={rules.bgAttrs} onChange={() => toggleRule('bgAttrs')} />
+          <RuleCheckbox label="TEXT" checked={rules.text} onChange={() => toggleRule('text')} />
+          <RuleCheckbox label="COMMENTS" checked={rules.comments} onChange={() => toggleRule('comments')} />
+          <RuleCheckbox label="BORDERS" checked={rules.borders} onChange={() => toggleRule('borders')} />
         </div>
       </div>
 
-      <footer className={`shrink-0 px-6 py-2 border-t flex justify-between items-center text-[10px] font-black text-slate-600 uppercase tracking-widest ${isDark ? 'bg-slate-950 border-slate-800' : 'bg-white border-slate-200'}`}>
-        <div className="flex gap-4">
-           <span>Engine: V4.0 Forensic</span>
-           <span className="opacity-40">|</span>
-           <span className="flex items-center gap-1.5 text-emerald-500"><ShieldCheck size={12}/> Verified RFC Sanitization</span>
+      {/* Three-Pane Layout */}
+      <div className="flex-1 flex overflow-hidden">
+        {/* Source HTML */}
+        <div className="flex-1 flex flex-col border-r border-slate-800/50">
+          <div className={`${panelHeaderClass} px-4 py-2 flex items-center gap-2`}>
+            <FileCode size={14} className="text-indigo-400" />
+            <span className="text-[10px] font-black uppercase tracking-widest text-slate-400">Source HTML</span>
+          </div>
+          <textarea 
+            value={inputHtml}
+            onChange={(e) => setInputHtml(e.target.value)}
+            className="flex-1 w-full bg-transparent p-6 outline-none font-mono text-[11px] text-slate-300 resize-none custom-scrollbar leading-relaxed"
+            placeholder="<!-- Paste your HTML tracking code here -->"
+          />
         </div>
-        <p>© {new Date().getFullYear()} Authenticator Pro Lab</p>
+
+        {/* Sanitized Markup */}
+        <div className="flex-1 flex flex-col border-r border-slate-800/50">
+          <div className={`${panelHeaderClass} px-4 py-2 flex items-center gap-2`}>
+            <Code size={14} className="text-emerald-400" />
+            <span className="text-[10px] font-black uppercase tracking-widest text-slate-400">Sanitized Markup</span>
+          </div>
+          <textarea 
+            readOnly
+            value={sanitizedHtml}
+            className="flex-1 w-full bg-transparent p-6 outline-none font-mono text-[11px] text-indigo-400/80 resize-none custom-scrollbar leading-relaxed"
+            placeholder="Forensic output matrix..."
+          />
+        </div>
+
+        {/* Visual Audit */}
+        <div className="flex-1 flex flex-col bg-white">
+          <div className="bg-white border-b border-slate-200 px-4 py-2 flex items-center gap-2">
+            <Eye size={14} className="text-slate-500" />
+            <span className="text-[10px] font-black uppercase tracking-widest text-slate-500">Visual Audit</span>
+          </div>
+          <div className="flex-1 relative">
+            <iframe 
+              srcDoc={sanitizedHtml || '<html><body style="display:flex;align-items:center;justify-center;height:100vh;margin:0;font-family:sans-serif;color:#94a3b8;background:#f8fafc;text-transform:uppercase;font-weight:900;letter-spacing:0.2em;font-size:11px;">Waiting for payload...</body></html>'} 
+              className="w-full h-full border-none"
+              title="Audit Preview"
+            />
+          </div>
+        </div>
+      </div>
+
+      {/* Forensic Report Dashboard */}
+      <div className="shrink-0 bg-[#0a0f1c] border-t border-slate-800/50 p-6 flex flex-col gap-6">
+        <div className="flex items-center gap-3">
+          <Database size={18} className="text-indigo-400" />
+          <h2 className="text-[12px] font-black uppercase tracking-[0.2em] text-white">Extracted Forensic Report</h2>
+        </div>
+        
+        <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+          <ForensicDropdown label="Image Sources" count={forensicReport.images.length} items={forensicReport.images} />
+          <ForensicDropdown label="Anchor Hrefs" count={forensicReport.links.length} items={forensicReport.links} />
+          <ForensicDropdown label="CSS Assets" count={forensicReport.cssAssets.length} items={forensicReport.cssAssets} />
+          <ForensicDropdown label="Colors Replaced" count={forensicReport.colors.length} items={forensicReport.colors} />
+        </div>
+      </div>
+
+      {/* Footer */}
+      <footer className="shrink-0 bg-[#05080f] border-t border-slate-900 px-6 py-2.5 flex items-center justify-between text-[9px] font-black uppercase tracking-widest text-slate-600">
+        <div className="flex gap-4">
+          <span>Engine: V4.0 Forensic</span>
+          <span className="text-emerald-500 flex items-center gap-1">
+            <ShieldCheck size={10} /> Verified RFC Sanitization
+          </span>
+        </div>
+        <span>© 2026 Authenticator Pro Lab</span>
       </footer>
     </div>
   );
 };
 
-const CleanerToggle = ({ label, checked, onChange }: { label: string, checked: boolean, onChange: () => void }) => (
+const RuleCheckbox = ({ label, checked, onChange }: { label: string; checked: boolean; onChange: () => void }) => (
   <label className="flex items-center gap-2 cursor-pointer group">
     <input type="checkbox" checked={checked} onChange={onChange} className="hidden" />
-    <div className={`w-3 h-3 rounded-sm border transition-all ${checked ? 'bg-indigo-600 border-indigo-600' : 'border-slate-700 group-hover:border-slate-500'}`}>
-       {checked && <Check size={10} className="text-white mx-auto" />}
+    <div className={`w-3.5 h-3.5 rounded border transition-all flex items-center justify-center ${checked ? 'bg-indigo-600 border-indigo-600' : 'border-slate-700 group-hover:border-slate-500'}`}>
+      {checked && <Check size={10} className="text-white font-black" strokeWidth={4} />}
     </div>
-    <span className={`text-[9px] font-black uppercase tracking-tighter transition-colors ${checked ? 'text-slate-100' : 'text-slate-600 group-hover:text-slate-400'}`}>
-      {label}
-    </span>
+    <span className={`text-[9px] font-black uppercase tracking-tighter transition-colors ${checked ? 'text-slate-200' : 'text-slate-600 group-hover:text-slate-400'}`}>{label}</span>
   </label>
 );
 
-const ReportItem = ({ title, count, items, isOpen, onToggle, isDark }: any) => (
-  <div className={`rounded-xl border overflow-hidden ${isDark ? 'bg-slate-900/50 border-slate-800' : 'bg-white border-slate-100'}`}>
-    <button onClick={onToggle} className="w-full px-4 py-3 flex items-center justify-between hover:bg-white/5 transition-all text-left">
-       <div className="flex items-center gap-2">
-          <span className={`text-[10px] font-black uppercase tracking-widest ${count > 0 ? 'text-indigo-400' : 'text-slate-600'}`}>{title}</span>
-          <span className={`text-[9px] font-black px-1.5 py-0.5 rounded ${isDark ? 'bg-slate-800 text-slate-400' : 'bg-slate-50 text-slate-500'}`}>{count}</span>
-       </div>
-       {isOpen ? <ChevronUp size={14} className="text-slate-600" /> : <ChevronDown size={14} className="text-slate-600" />}
-    </button>
-    {isOpen && (
-      <div className={`p-3 border-t max-h-40 overflow-y-auto custom-scrollbar ${isDark ? 'bg-slate-950/50 border-slate-800' : 'bg-slate-50 border-slate-100'}`}>
-         {items.length > 0 ? (
-           <ul className="space-y-2">
-             {items.map((item: string, i: number) => (
-               <li key={i} className="text-[9px] font-mono text-slate-500 break-all leading-tight">
-                 {item}
-               </li>
-             ))}
-           </ul>
-         ) : (
-           <span className="text-[9px] italic text-slate-700">No entries found</span>
-         )}
-      </div>
-    )}
-  </div>
-);
+const ForensicDropdown = ({ label, count, items }: { label: string; count: number; items: string[] }) => {
+  const [isOpen, setIsOpen] = useState(false);
+  return (
+    <div className="relative">
+      <button 
+        onClick={() => setIsOpen(!isOpen)}
+        className="w-full flex items-center justify-between px-4 py-3 bg-[#050812] border border-slate-800/50 rounded-xl hover:border-indigo-500/50 transition-all group"
+      >
+        <div className="flex items-center gap-3">
+          <span className="text-[9px] font-black uppercase tracking-widest text-slate-500">{label}</span>
+          <span className="px-2 py-0.5 rounded-full bg-slate-800 text-[10px] font-mono font-bold text-slate-400 group-hover:text-white">{count}</span>
+        </div>
+        <ChevronDown size={14} className={`text-slate-600 transition-transform ${isOpen ? 'rotate-180' : ''}`} />
+      </button>
+      
+      {isOpen && items.length > 0 && (
+        <div className="absolute bottom-full mb-2 w-full max-h-40 overflow-y-auto bg-[#0a0f1c] border border-indigo-500/30 rounded-xl shadow-2xl p-2 z-[200] custom-scrollbar animate-in slide-in-from-bottom-2">
+          {items.map((item, i) => (
+            <div key={i} className="px-3 py-2 text-[9px] font-mono text-indigo-300 break-all border-b border-slate-800/50 last:border-0 hover:bg-indigo-500/10 rounded">
+              {item}
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+};
 
 export default HtmlCleanerTool;

@@ -6,309 +6,235 @@ import {
   Zap, 
   Loader2, 
   Globe, 
-  Database,
   Grid,
-  ShieldAlert,
-  Download,
-  Copy,
-  Check,
-  CheckCircle2,
-  XCircle,
+  Activity,
   Wifi,
   Terminal,
-  Activity,
-  Filter,
-  X
+  Server,
+  Layers
 } from 'lucide-react';
-import { BlacklistAuditEntry, DnsResponse } from '../types';
-import { lookupPtrRecord } from '../services/dnsService';
+import { DnsResponse } from '../types';
 import { useNotify } from '../App';
+import { lookupPtrRecord } from '../services/dnsService';
 
-interface BulkBlacklistToolProps {
-  onBack: () => void;
-  theme: 'dark' | 'light';
+interface MatrixEntry {
+  id: number;
+  target: string;
+  type: 'ip' | 'domain';
+  statusLabel: string;
+  statusColor: 'neutral' | 'positive' | 'negative' | 'loading' | 'pending';
+  spamhaus: 'clean' | 'listed' | 'loading' | 'pending' | 'error';
+  spamcop: 'clean' | 'listed' | 'loading' | 'pending' | 'error' | 'n/a';
+  barracuda: 'clean' | 'listed' | 'loading' | 'pending' | 'error';
 }
 
 const DQS_KEY = 'cnrmf6qnuzmpx57lve7mtvhr2q';
 
-const BulkBlacklistTool: React.FC<BulkBlacklistToolProps> = ({ onBack, theme }) => {
+const BulkBlacklistTool: React.FC<{ onBack: () => void; theme: 'dark' | 'light' }> = ({ onBack, theme }) => {
   const { notify } = useNotify();
   const isDark = theme === 'dark';
   
-  const [ipInput, setIpInput] = useState('');
-  const [domainInput, setDomainInput] = useState('');
-  const [results, setResults] = useState<BlacklistAuditEntry[]>([]);
+  const [inputMode, setInputMode] = useState<'ip' | 'domain'>('ip');
+  const [inputText, setInputText] = useState('');
+  const [results, setResults] = useState<MatrixEntry[]>([]);
   const [isProcessing, setIsProcessing] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
-  const [progress, setProgress] = useState(0);
 
-  const queryDnsbl = async (query: string): Promise<boolean> => {
-    try {
-      const res = await fetch(`https://dns.google/resolve?name=${query}&type=A`);
-      const data: DnsResponse = await res.json();
-      return !!(data.Status === 0 && data.Answer);
-    } catch {
-      return false;
-    }
+  const queryDns = async (name: string, type: string = 'A'): Promise<DnsResponse> => {
+    const res = await fetch(`https://dns.google/resolve?name=${name}&type=${type}`);
+    return await res.json();
   };
 
-  const auditSingleEntry = async (item: string, type: 'ip' | 'domain'): Promise<Partial<BlacklistAuditEntry>> => {
-    const res: Partial<BlacklistAuditEntry> = {
+  const auditTarget = async (item: MatrixEntry): Promise<Partial<MatrixEntry>> => {
+    const update: Partial<MatrixEntry> = {
       spamhaus: 'pending',
-      spamcop: type === 'ip' ? 'pending' : 'n/a',
+      spamcop: 'pending',
       barracuda: 'pending',
-      ptr: 'Checking...'
     };
 
     try {
-      if (type === 'ip') {
-        const reversed = item.split('.').reverse().join('.');
-        const [ptr, sh, sc, bc] = await Promise.all([
-          lookupPtrRecord(item),
-          queryDnsbl(`${reversed}.${DQS_KEY}.zen.dq.spamhaus.net`),
-          queryDnsbl(`${reversed}.bl.spamcop.net`),
-          queryDnsbl(`${reversed}.b.barracudacentral.org`)
-        ]);
-
-        res.ptr = ptr || 'No PTR Record';
-        res.spamhaus = sh ? 'listed' : 'clean';
-        res.spamcop = sc ? 'listed' : 'clean';
-        res.barracuda = bc ? 'listed' : 'clean';
+      if (item.type === 'ip') {
+        const reversed = item.target.split('.').reverse().join('.');
+        const ptr = await lookupPtrRecord(item.target);
+        update.statusLabel = ptr || 'No PTR Record';
+        update.statusColor = ptr ? 'positive' : 'neutral';
+        const shRes = await queryDns(`${reversed}.${DQS_KEY}.zen.dq.spamhaus.net`);
+        update.spamhaus = (shRes.Status === 0 && shRes.Answer) ? 'listed' : 'clean';
+        const scRes = await queryDns(`${reversed}.bl.spamcop.net`);
+        update.spamcop = (scRes.Status === 0 && scRes.Answer) ? 'listed' : 'clean';
+        const bcRes = await queryDns(`${reversed}.b.barracudacentral.org`);
+        update.barracuda = (bcRes.Status === 0 && bcRes.Answer) ? 'listed' : 'clean';
       } else {
-        const [sh, bc] = await Promise.all([
-          queryDnsbl(`${item}.${DQS_KEY}.dbl.dq.spamhaus.net`),
-          queryDnsbl(`${item}.dbl.barracudacentral.org`)
-        ]);
-
-        res.ptr = 'Domain status check';
-        res.spamhaus = sh ? 'listed' : 'clean';
-        res.barracuda = bc ? 'listed' : 'clean';
-        res.spamcop = 'n/a';
+        update.statusLabel = 'Domain Check';
+        update.statusColor = 'neutral';
+        const shRes = await queryDns(`${item.target}.${DQS_KEY}.dbl.dq.spamhaus.net`);
+        update.spamhaus = (shRes.Status === 0 && shRes.Answer) ? 'listed' : 'clean';
+        update.spamcop = 'n/a';
+        const bcRes = await queryDns(`${item.target}.dbl.barracudacentral.org`);
+        update.barracuda = (bcRes.Status === 0 && bcRes.Answer) ? 'listed' : 'clean';
       }
-      return res;
+      return update;
     } catch (e) {
-      return { ...res, status: 'error' };
+      return { spamhaus: 'error', spamcop: 'error', barracuda: 'error', statusLabel: 'Node Error' };
     }
   };
 
   const handleAudit = async () => {
-    const rawIps = ipInput.split(/[\n,]/).map(i => i.trim()).filter(i => i.length > 0);
-    const rawDomains = domainInput.split(/[\n,]/).map(d => d.trim()).filter(d => d.length > 0);
+    const targets = inputText.split(/[\n,]/).map(d => d.trim()).filter(d => d.length > 0);
 
-    const initialEntries: BlacklistAuditEntry[] = [
-      ...rawIps.map((ip, i) => ({ id: i + 1, input: ip, type: 'ip' as const, ptr: '...', spamhaus: 'pending' as const, spamcop: 'pending' as const, barracuda: 'pending' as const, status: 'pending' as const })),
-      ...rawDomains.map((dom, i) => ({ id: rawIps.length + i + 1, input: dom, type: 'domain' as const, ptr: '...', spamhaus: 'pending' as const, spamcop: 'n/a' as const, barracuda: 'pending' as const, status: 'pending' as const }))
-    ];
-
-    if (initialEntries.length === 0) {
-      notify('warning', 'Please provide IPs or Domains to check.');
+    if (targets.length === 0) {
+      notify('warning', `Please provide ${inputMode === 'ip' ? 'IPv4 addresses' : 'domain names'} to audit.`);
       return;
     }
 
+    const initialEntries: MatrixEntry[] = targets.map((target, i) => ({
+      id: i + 1,
+      target: inputMode === 'domain' ? target.toLowerCase() : target,
+      type: inputMode,
+      statusLabel: 'Waiting...',
+      statusColor: 'pending' as const,
+      spamhaus: 'pending' as const,
+      spamcop: 'pending' as const,
+      barracuda: 'pending' as const
+    }));
+
     setResults(initialEntries);
     setIsProcessing(true);
-    setProgress(0);
-    notify('info', `Checking ${initialEntries.length} targets...`);
 
-    const BATCH_SIZE = 5;
+    const BATCH_SIZE = 4;
     for (let i = 0; i < initialEntries.length; i += BATCH_SIZE) {
       const batch = initialEntries.slice(i, i + BATCH_SIZE);
-      
       await Promise.all(batch.map(async (entry) => {
-        setResults(prev => prev.map(r => r.id === entry.id ? { ...r, status: 'loading' } : r));
-        const audit = await auditSingleEntry(entry.input, entry.type);
-        setResults(prev => prev.map(r => r.id === entry.id ? { ...r, ...audit, status: 'complete' } : r));
+        setResults(prev => prev.map(r => r.id === entry.id ? { ...r, spamhaus: 'loading', spamcop: 'loading', barracuda: 'loading' } : r));
+        const audit = await auditTarget(entry);
+        setResults(prev => prev.map(r => r.id === entry.id ? { ...r, ...audit } as MatrixEntry : r));
       }));
-
-      setProgress(Math.round(((i + batch.length) / initialEntries.length) * 100));
-      await new Promise(resolve => setTimeout(resolve, 500));
     }
-
     setIsProcessing(false);
-    notify('success', 'Blacklist check complete.');
+    notify('success', 'Audit complete.');
   };
 
   const filteredResults = useMemo(() => {
     const q = searchQuery.toLowerCase();
-    return results.filter(r => r.input.toLowerCase().includes(q) || r.ptr.toLowerCase().includes(q));
+    return results.filter(r => r.target.includes(q) || r.statusLabel.toLowerCase().includes(q));
   }, [results, searchQuery]);
 
-  const stats = useMemo(() => ({
-    listed: results.filter(r => r.spamhaus === 'listed' || r.spamcop === 'listed' || r.barracuda === 'listed').length,
-    clean: results.filter(r => r.status === 'complete' && r.spamhaus === 'clean' && (r.spamcop === 'clean' || r.spamcop === 'n/a') && r.barracuda === 'clean').length
-  }), [results]);
-
-  const cardClasses = isDark ? 'bg-[#0a0f18] border-[#1e293b] text-slate-100' : 'bg-white border-slate-200 text-slate-900';
-  const inputClasses = isDark ? 'bg-[#05080f] border-[#1e293b] text-slate-200 focus:border-indigo-500' : 'bg-slate-50 border-slate-200 text-slate-900 focus:border-indigo-600';
+  const cardClasses = isDark ? 'bg-[#0a0f18] border-[#1e293b] text-slate-100 shadow-2xl' : 'bg-white border-slate-200 text-slate-900 shadow-xl';
+  const inputClasses = isDark ? 'bg-[#05080f] border-[#1e293b] text-slate-200 focus:border-orange-500' : 'bg-slate-50 border-slate-200 text-slate-900 focus:border-orange-600';
 
   return (
-    <div className="min-h-screen p-4 md:p-8 flex flex-col gap-6 max-w-7xl mx-auto animate-in fade-in duration-500">
-      <header className={`flex items-center justify-between p-6 rounded-[2rem] shadow-2xl border ${cardClasses}`}>
+    <div className="min-h-screen px-4 md:px-8 py-6 flex flex-col gap-6 max-w-7xl mx-auto animate-in fade-in duration-500">
+      <header className={`flex items-center justify-between p-5 rounded-[2rem] shadow-xl border ${cardClasses}`}>
         <div className="flex items-center gap-4">
-          <button onClick={onBack} className={`p-2.5 rounded-2xl transition-all border ${isDark ? 'bg-slate-800 border-slate-700 text-slate-400 hover:text-white' : 'bg-slate-100 border-slate-200'}`}>
+          <button onClick={onBack} className={`p-2.5 rounded-2xl transition-all border ${isDark ? 'bg-slate-800 border-slate-700 text-slate-400 hover:text-white' : 'bg-slate-100 border-slate-200 text-slate-600'}`}>
             <ArrowLeft size={20} />
           </button>
           <div className="flex items-center gap-3">
-            <div className="bg-indigo-600 p-2.5 rounded-2xl text-white shadow-xl">
+            <div className="bg-orange-600 p-2.5 rounded-2xl text-white shadow-xl shadow-orange-600/20">
               <Grid size={28} />
             </div>
             <div>
-              <h1 className="text-xl md:text-2xl font-black tracking-tight uppercase text-indigo-500">Blacklist Checker</h1>
-              <p className="text-slate-500 text-[10px] font-black uppercase tracking-widest opacity-60">Check status on multiple blacklists</p>
+              <h1 className="text-xl md:text-2xl font-black uppercase tracking-tight text-orange-500">Blacklist Checker</h1>
+              <p className="text-slate-500 text-[10px] font-black uppercase tracking-widest opacity-60">Bulk Node Reputation Audit</p>
             </div>
           </div>
         </div>
+        {results.length > 0 && <button onClick={() => setResults([])} className="p-2.5 bg-rose-500/10 text-rose-400 hover:bg-rose-500/20 rounded-2xl border border-rose-500/20 transition-all"><Trash2 size={20} /></button>}
       </header>
 
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        <div className={`p-8 rounded-[2.5rem] shadow-xl border flex flex-col gap-4 ${cardClasses}`}>
-           <div className="flex items-center justify-between">
-              <span className="text-[10px] font-black text-slate-500 uppercase tracking-widest flex items-center gap-2">
-                 <Wifi size={14} className="text-indigo-400" /> IP List
-              </span>
+      <div className="flex flex-col gap-6">
+        <div className={`p-8 rounded-[2rem] border flex flex-col gap-6 ${cardClasses}`}>
+           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+             <div className="flex flex-col gap-3">
+                <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest">Select Audit Mode</label>
+                <div className={`flex p-1 rounded-2xl border transition-all ${isDark ? 'bg-[#05080f] border-slate-800' : 'bg-slate-50 border-slate-100'}`}>
+                   <button 
+                    onClick={() => { setInputMode('ip'); setInputText(''); }} 
+                    className={`flex-1 flex items-center justify-center gap-2 py-3 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all ${inputMode === 'ip' ? 'bg-orange-600 text-white shadow-lg' : 'text-slate-500 hover:text-slate-300'}`}
+                   >
+                     <Wifi size={14} /> IP MODE
+                   </button>
+                   <button 
+                    onClick={() => { setInputMode('domain'); setInputText(''); }} 
+                    className={`flex-1 flex items-center justify-center gap-2 py-3 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all ${inputMode === 'domain' ? 'bg-orange-600 text-white shadow-lg' : 'text-slate-500 hover:text-slate-300'}`}
+                   >
+                     <Globe size={14} /> DOMAIN MODE
+                   </button>
+                </div>
+             </div>
+             <div className="flex flex-col gap-3">
+                <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest flex items-center gap-2">
+                   <Terminal size={12} className="text-orange-500" /> {inputMode === 'ip' ? 'IPV4 NODES (One per line)' : 'DOMAIN HOSTS (One per line)'}
+                </label>
+                <textarea 
+                  value={inputText} 
+                  onChange={(e) => setInputText(e.target.value)} 
+                  placeholder={inputMode === 'ip' ? "8.8.8.8\n1.1.1.1" : "google.com\nmicrosoft.com"} 
+                  className={`w-full h-32 p-4 border rounded-[1.5rem] outline-none font-mono text-sm resize-none transition-all ${inputClasses}`} 
+                />
+             </div>
            </div>
-           <textarea
-             value={ipInput}
-             onChange={(e) => setIpInput(e.target.value)}
-             placeholder="8.8.8.8, 1.1.1.1"
-             className={`w-full h-40 p-5 border rounded-2xl outline-none font-mono text-xs resize-none transition-all ${inputClasses}`}
-           />
+           
+           <button onClick={handleAudit} disabled={isProcessing || !inputText.trim()} className="w-full py-5 bg-orange-600 hover:bg-orange-500 text-white rounded-2xl font-black uppercase tracking-widest text-[11px] shadow-lg disabled:opacity-50 flex items-center justify-center gap-2 transition-all">
+              {isProcessing ? <><Loader2 size={18} className="animate-spin" /> AUDITING MATRIX...</> : <><Zap size={18} /> RUN GLOBAL REPUTATION CHECK</>}
+           </button>
         </div>
 
-        <div className={`p-8 rounded-[2.5rem] shadow-xl border flex flex-col gap-4 ${cardClasses}`}>
-           <div className="flex items-center justify-between">
-              <span className="text-[10px] font-black text-slate-500 uppercase tracking-widest flex items-center gap-2">
-                 <Globe size={14} className="text-indigo-400" /> Domain List
-              </span>
+        <div className={`rounded-[2rem] border overflow-hidden animate-in slide-in-from-bottom-4 duration-500 flex flex-col ${cardClasses}`}>
+           <div className={`p-6 border-b flex flex-col sm:flex-row gap-4 items-center justify-between ${isDark ? 'bg-[#05080f] border-[#1e293b]' : 'bg-slate-50 border-slate-100'}`}>
+              <div className="flex items-center gap-3">
+                 <Activity size={18} className="text-orange-400" />
+                 <h2 className="text-[12px] font-black uppercase tracking-widest">Audit Outcome Matrix</h2>
+              </div>
+              <div className="relative flex-1 max-w-md w-full ml-auto">
+                <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-600" size={14} />
+                <input type="text" placeholder="Search result node..." value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)} className={`w-full pl-11 pr-4 py-3 border rounded-2xl outline-none text-sm font-bold transition-all ${inputClasses}`} />
+              </div>
            </div>
-           <textarea
-             value={domainInput}
-             onChange={(e) => setDomainInput(e.target.value)}
-             placeholder="google.com, apple.com"
-             className={`w-full h-40 p-5 border rounded-2xl outline-none font-mono text-xs resize-none transition-all ${inputClasses}`}
-           />
-        </div>
-      </div>
-
-      <div className="flex flex-col sm:flex-row items-center justify-between gap-4">
-         <div className="flex gap-4">
-            <div className={`px-4 py-2 rounded-2xl border ${isDark ? 'bg-slate-900 border-slate-800' : 'bg-white border-slate-200'}`}>
-               <span className="text-[8px] font-black text-slate-500 uppercase block tracking-widest">Protocol</span>
-               <span className="text-[10px] font-bold text-indigo-400">DNS Check</span>
-            </div>
-         </div>
-
-         <div className="flex gap-3 w-full sm:w-auto">
-            {results.length > 0 && (
-              <button onClick={() => setResults([])} className="p-4 bg-rose-500/10 text-rose-500 border border-rose-500/20 rounded-2xl transition-all hover:bg-rose-500/20">
-                 <Trash2 size={18} />
-              </button>
-            )}
-            <button
-              onClick={handleAudit}
-              disabled={isProcessing || (!ipInput.trim() && !domainInput.trim())}
-              className="flex-1 sm:flex-none px-12 py-4 bg-indigo-600 hover:bg-indigo-500 text-white rounded-2xl font-black uppercase tracking-widest text-[10px] shadow-2xl shadow-indigo-600/20 disabled:opacity-50 flex items-center justify-center gap-3 transition-all"
-            >
-              {isProcessing ? <><Loader2 size={16} className="animate-spin" /> Checking...</> : <><Zap size={16} /> Run Checker</>}
-            </button>
-         </div>
-      </div>
-
-      {isProcessing && (
-        <div className="w-full h-1.5 bg-slate-900 rounded-full overflow-hidden border border-slate-800">
-           <div className="h-full bg-indigo-500 transition-all duration-300" style={{ width: `${progress}%` }} />
-        </div>
-      )}
-
-      {results.length > 0 && (
-        <div className={`rounded-[2.5rem] shadow-2xl border overflow-hidden ${cardClasses}`}>
-          <div className={`p-6 border-b flex flex-col md:flex-row gap-4 items-center justify-between ${isDark ? 'bg-[#05080f] border-[#1e293b]' : 'bg-slate-50 border-slate-100'}`}>
-            <div className="flex items-center gap-3">
-               <Filter size={14} className="text-indigo-500" />
-               <h2 className="text-[10px] font-black uppercase tracking-[0.3em]">Results</h2>
-            </div>
-            
-            <div className="relative flex-1 max-w-md w-full">
-              <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-500" size={14} />
-              <input
-                type="text"
-                placeholder="Search..."
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-                className={`w-full pl-11 pr-4 py-3 border rounded-2xl outline-none text-xs font-bold transition-all ${inputClasses}`}
-              />
-            </div>
-
-            <div className="flex gap-4">
-               <div className="text-right">
-                  <p className="text-[8px] font-black text-slate-500 uppercase">Listed</p>
-                  <p className="text-sm font-black text-rose-500">{stats.listed}</p>
-               </div>
-               <div className="text-right border-l border-slate-800 pl-4">
-                  <p className="text-[8px] font-black text-slate-500 uppercase">Clean</p>
-                  <p className="text-sm font-black text-emerald-500">{stats.clean}</p>
-               </div>
-            </div>
-          </div>
-
-          <div className="overflow-x-auto">
-            <table className="w-full text-left">
-              <thead>
-                <tr className={`${isDark ? 'bg-[#05080f] border-[#1e293b]' : 'bg-slate-100 border-slate-200'} border-b text-[10px] font-black uppercase tracking-[0.25em] text-slate-500`}>
-                  <th className="px-8 py-5 w-16 text-center">ID</th>
-                  <th className="px-8 py-5">Target</th>
-                  <th className="px-8 py-5">Status</th>
-                  <th className="px-8 py-5 text-center">Spamhaus</th>
-                  <th className="px-8 py-5 text-center">SpamCop</th>
-                  <th className="px-8 py-5 text-center">Barracuda</th>
-                </tr>
-              </thead>
-              <tbody className={`divide-y ${isDark ? 'divide-[#1e293b]' : 'divide-slate-100'}`}>
-                {filteredResults.map((r) => (
-                  <tr key={r.id} className="hover:bg-indigo-500/5 transition-colors group">
-                    <td className="px-8 py-5 text-[10px] font-mono font-bold text-slate-600 text-center">{r.id}</td>
-                    <td className="px-8 py-5">
-                       <div className="flex flex-col">
-                          <span className={`text-sm font-black tracking-tight ${isDark ? 'text-slate-100' : 'text-slate-900'}`}>{r.input}</span>
-                          <span className="text-[8px] font-black text-slate-500 uppercase tracking-widest mt-0.5">{r.type} Check</span>
-                       </div>
-                    </td>
-                    <td className="px-8 py-5">
-                       <span className="text-[10px] font-bold text-slate-500 italic truncate max-w-[200px] block">{r.ptr}</span>
-                    </td>
-                    <td className="px-8 py-5 text-center"><ListedBadge status={r.spamhaus} /></td>
-                    <td className="px-8 py-5 text-center">
-                       {r.type === 'ip' ? <ListedBadge status={r.spamcop} /> : <span className="text-[9px] text-slate-700">—</span>}
-                    </td>
-                    <td className="px-8 py-5 text-center"><ListedBadge status={r.barracuda} /></td>
+           <div className="flex-1 overflow-x-auto min-h-[400px]">
+              <table className="w-full text-left">
+                <thead>
+                  <tr className={`${isDark ? 'bg-[#05080f] border-[#1e293b]' : 'bg-slate-100 border-slate-200'} border-b text-[10px] font-black uppercase tracking-widest text-slate-500`}>
+                    <th className="px-8 py-5 w-16 text-center">ID</th>
+                    <th className="px-8 py-5">Node Identity</th>
+                    <th className="px-8 py-5 text-center">Spamhaus (DQS)</th>
+                    <th className="px-8 py-5 text-center">SpamCop</th>
+                    <th className="px-8 py-5 text-center">Barracuda</th>
                   </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
+                </thead>
+                <tbody className={`divide-y ${isDark ? 'divide-[#1e293b]' : 'divide-slate-100'}`}>
+                  {filteredResults.length > 0 ? filteredResults.map((r) => (
+                    <tr key={r.id} className="hover:bg-orange-500/5 transition-all group">
+                      <td className="px-8 py-6 text-sm font-mono font-bold text-slate-600 text-center">{r.id}</td>
+                      <td className="px-8 py-6">
+                         <div className="flex flex-col">
+                            <span className={`text-xl font-black tracking-tight ${isDark ? 'text-white' : 'text-slate-900'}`}>{r.target}</span>
+                            <span className="text-[11px] text-slate-500 font-bold uppercase tracking-widest mt-0.5">{r.statusLabel}</span>
+                         </div>
+                      </td>
+                      <td className="px-8 py-6 text-center"><StatusBadge status={r.spamhaus} /></td>
+                      <td className="px-8 py-6 text-center">{r.spamcop === 'n/a' ? '—' : <StatusBadge status={r.spamcop as any} />}</td>
+                      <td className="px-8 py-6 text-center"><StatusBadge status={r.barracuda} /></td>
+                    </tr>
+                  )) : (
+                    <tr><td colSpan={5} className="py-32 text-center text-slate-600 opacity-20 uppercase font-black text-xs tracking-widest">Awaiting Analysis Data</td></tr>
+                  )}
+                </tbody>
+              </table>
+           </div>
         </div>
-      )}
-
-      <footer className={`shrink-0 px-6 py-4 border-t flex justify-between items-center text-[10px] font-black text-slate-600 uppercase tracking-widest ${isDark ? 'border-slate-800' : 'border-slate-200'}`}>
-        <p>© {new Date().getFullYear()} Toolbox</p>
-      </footer>
+      </div>
     </div>
   );
 };
 
-const ListedBadge = ({ status }: { status: string }) => {
-  if (status === 'pending') return <span className="text-[9px] text-slate-700 animate-pulse uppercase font-black">...</span>;
-  if (status === 'error') return <span className="text-[9px] text-rose-500 uppercase font-black">Err</span>;
-  if (status === 'n/a') return <span className="text-[9px] text-slate-800 uppercase font-black">—</span>;
-  
-  const isListed = status === 'listed';
+const StatusBadge = ({ status }: { status: MatrixEntry['spamhaus'] }) => {
+  if (status === 'loading') return <div className="w-2.5 h-2.5 rounded-full bg-orange-500 animate-pulse mx-auto" />;
+  if (status === 'pending') return <div className="w-2 h-2 rounded-full bg-slate-800 mx-auto" />;
+  const isClean = status === 'clean';
   return (
-    <span className={`px-2.5 py-1 rounded-lg text-[9px] font-black uppercase tracking-[0.1em] border transition-all ${
-      isListed 
-        ? 'bg-rose-500/10 text-rose-500 border-rose-500/20' 
-        : 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20'
-    }`}>
-      {isListed ? 'LISTED' : 'CLEAN'}
+    <span className={`px-5 py-2 rounded-xl text-[11px] font-black border uppercase tracking-widest transition-all ${isClean ? 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20' : 'bg-rose-500/10 text-rose-500 border-rose-500/20'}`}>
+      {isClean ? 'CLEAN' : 'LISTED'}
     </span>
   );
 };

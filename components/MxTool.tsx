@@ -1,27 +1,17 @@
-
 import React, { useState, useMemo } from 'react';
 import { 
   Search, 
   Trash2, 
-  Play, 
   Mail, 
-  ExternalLink,
   Loader2,
   ArrowLeft,
   Copy,
   Check,
-  AlertTriangle,
-  Server,
-  Cloud,
-  FileText,
-  CheckCircle2,
-  Filter,
-  X
+  Zap
 } from 'lucide-react';
 import { MxRecord } from '../types';
 import { lookupMxRecords } from '../services/dnsService';
 
-// Added theme to MxToolProps interface
 interface MxToolProps {
   onBack: () => void;
   theme: 'dark' | 'light';
@@ -33,7 +23,6 @@ interface BulkMxResult {
   status: 'pending' | 'loading' | 'success' | 'not_found' | 'error';
 }
 
-// Updated component to accept theme and handle conditional styles
 const MxTool: React.FC<MxToolProps> = ({ onBack, theme }) => {
   const isDark = theme === 'dark';
   const [domainsInput, setDomainsInput] = useState('');
@@ -41,10 +30,8 @@ const MxTool: React.FC<MxToolProps> = ({ onBack, theme }) => {
   const [isProcessing, setIsProcessing] = useState(false);
   const [copiedIndex, setCopiedIndex] = useState<number | null>(null);
   const [searchQuery, setSearchQuery] = useState('');
-  const [filterProvider, setFilterProvider] = useState<string | null>(null);
 
   const handleLookup = async () => {
-    // Fix: Explicitly type domainList and use Set<string> to prevent 'unknown' type inference in bulk lookup
     const domainList: string[] = Array.from(new Set<string>(
       domainsInput
         .split(/[\n,]/)
@@ -61,7 +48,6 @@ const MxTool: React.FC<MxToolProps> = ({ onBack, theme }) => {
     }));
 
     setResults(initialResults);
-    setFilterProvider(null);
     setIsProcessing(true);
 
     for (let i = 0; i < initialResults.length; i++) {
@@ -93,315 +79,129 @@ const MxTool: React.FC<MxToolProps> = ({ onBack, theme }) => {
     setTimeout(() => setCopiedIndex(null), 2000);
   };
 
-  const stats = useMemo(() => {
-    const providers = results.flatMap(r => r.records.map(rec => rec.provider));
-    const providerCounts = providers.reduce((acc, curr) => {
-      acc[curr] = (acc[curr] || 0) + 1;
-      return acc;
-    }, {} as Record<string, number>);
-
-    // Fix: Explicitly cast counts for arithmetic operation in sort to satisfy TS compiler
-    const providerList = (Object.entries(providerCounts) as [string, number][])
-      .sort((a, b) => b[1] - a[1])
-      .map(([name, count]) => ({ name, count }));
-
-    return {
-      total: results.length,
-      processed: results.filter(r => r.status !== 'pending' && r.status !== 'loading').length,
-      found: results.filter(r => r.status === 'success').length,
-      notFound: results.filter(r => r.status === 'not_found').length,
-      providers: providerList
-    };
-  }, [results]);
-
   const filteredResults = useMemo(() => {
     return results.filter(r => {
       const matchesSearch = r.domain.includes(searchQuery.toLowerCase()) || 
                           r.records.some(rec => rec.exchange.includes(searchQuery.toLowerCase()) || rec.provider.includes(searchQuery.toLowerCase()));
-      
-      const matchesProvider = !filterProvider || r.records.some(rec => rec.provider === filterProvider);
-      
-      return matchesSearch && matchesProvider;
+      return matchesSearch;
     });
-  }, [results, searchQuery, filterProvider]);
+  }, [results, searchQuery]);
 
   const clear = () => {
     setDomainsInput('');
     setResults([]);
     setSearchQuery('');
-    setFilterProvider(null);
   };
 
-  const toggleProviderFilter = (providerName: string) => {
-    if (filterProvider === providerName) {
-      setFilterProvider(null);
-    } else {
-      setFilterProvider(providerName);
-    }
-  };
-
-  const cardClasses = isDark ? 'bg-slate-900 border-slate-800 text-slate-100' : 'bg-white border-slate-200 text-slate-900';
-  const inputClasses = isDark ? 'bg-slate-950 border-slate-800 text-slate-200' : 'bg-slate-50 border-slate-200 text-slate-900';
+  const cardClasses = isDark ? 'bg-[#0a0f18] border-[#1e293b] text-slate-100' : 'bg-white border-slate-200 text-slate-900';
+  const inputClasses = isDark ? 'bg-[#05080f] border-[#1e293b] text-slate-200 focus:border-rose-500' : 'bg-slate-50 border-slate-200 text-slate-900 focus:border-rose-600';
 
   return (
-    <div className="min-h-screen p-4 md:p-8 flex flex-col gap-6 max-w-7xl mx-auto animate-in fade-in duration-500">
-      {/* Header */}
-      <header className={`flex flex-col md:flex-row md:items-center justify-between gap-4 p-6 rounded-2xl shadow-xl border ${cardClasses}`}>
+    <div className="min-h-screen px-4 pt-3 pb-8 md:px-8 md:pt-4 md:pb-8 flex flex-col gap-6 max-w-7xl mx-auto animate-in fade-in duration-500">
+      <header className={`flex flex-col md:flex-row md:items-center justify-between gap-4 p-5 rounded-3xl shadow-xl border ${cardClasses}`}>
         <div className="flex items-center gap-4">
-          <button 
-            onClick={onBack}
-            className={`p-2 rounded-xl transition-all border ${isDark ? 'bg-slate-800 border-slate-700 text-slate-400 hover:text-white hover:bg-slate-700' : 'bg-slate-100 border-slate-200 text-slate-600 hover:bg-slate-200'}`}
-          >
+          <button onClick={onBack} className={`p-2 rounded-xl transition-all border ${isDark ? 'bg-slate-800 border-slate-700 text-slate-400 hover:text-white' : 'bg-slate-100 border-slate-200'}`}>
             <ArrowLeft size={20} />
           </button>
           <div className="flex items-center gap-3">
-            <div className="bg-rose-500 p-2.5 rounded-xl text-white shadow-lg shadow-rose-500/20">
+            <div className="bg-rose-500 p-2.5 rounded-xl text-white shadow-lg">
               <Mail size={28} />
             </div>
             <div>
-              <h1 className="text-xl md:text-2xl font-bold tracking-tight">Bulk MX & Provider Audit</h1>
-              <p className="text-slate-400 text-xs md:text-sm">Identify Email Hosting & Mail Architecture</p>
+              <h1 className="text-xl md:text-2xl font-black tracking-tight text-rose-500 uppercase">MX Checker</h1>
+              <p className="text-slate-500 text-[10px] font-black uppercase tracking-widest opacity-60">Identify Mail Infrastructure Architecture</p>
             </div>
           </div>
         </div>
         {results.length > 0 && (
-          <button onClick={clear} className="px-4 py-2 bg-rose-500/10 text-rose-400 hover:bg-rose-500/20 rounded-lg text-sm font-bold transition-all border border-rose-500/20 flex items-center gap-2">
+          <button onClick={clear} className="px-4 py-2 bg-rose-500/10 text-rose-400 hover:bg-rose-500/20 rounded-lg text-xs font-black uppercase tracking-widest transition-all border border-rose-500/20 flex items-center gap-2">
             <Trash2 size={16} /> Reset
           </button>
         )}
       </header>
 
-      {/* Main Grid */}
-      <div className="grid grid-cols-1 lg:grid-cols-4 gap-6">
-        {/* Input Pane */}
-        <div className="lg:col-span-1 flex flex-col gap-6">
-          <div className={`p-6 rounded-2xl shadow-xl border flex flex-col gap-4 ${cardClasses}`}>
+      <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
+        <div className="lg:col-span-4 flex flex-col gap-6">
+          <div className={`p-6 rounded-3xl shadow-xl border flex flex-col gap-4 ${cardClasses}`}>
             <div>
-              <label className="block text-sm font-semibold mb-2">Domains to Analyze</label>
+              <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest mb-3 block">Target Domains Matrix</label>
               <textarea
                 value={domainsInput}
                 onChange={(e) => setDomainsInput(e.target.value)}
-                placeholder="apple.com&#10;microsoft.com, google.com"
-                className={`w-full h-48 p-4 rounded-xl focus:ring-2 focus:ring-rose-500 focus:border-transparent outline-none transition-all font-mono text-sm resize-none placeholder:text-slate-400 ${inputClasses}`}
+                placeholder="apple.com&#10;google.com"
+                className={`w-full h-48 p-4 rounded-xl focus:ring-2 focus:ring-rose-500 outline-none transition-all font-mono text-sm resize-none ${inputClasses}`}
               />
             </div>
             <button
               onClick={handleLookup}
               disabled={isProcessing || !domainsInput.trim()}
-              className="w-full flex items-center justify-center gap-2 py-4 bg-rose-600 hover:bg-rose-500 disabled:bg-slate-800 disabled:text-slate-600 text-white rounded-xl transition-all shadow-lg shadow-rose-500/10 font-bold"
+              className="w-full flex items-center justify-center gap-3 py-4 bg-rose-600 hover:bg-rose-500 disabled:opacity-50 text-white rounded-2xl transition-all shadow-lg font-black uppercase text-[10px] tracking-widest"
             >
-              {isProcessing ? (
-                <><Loader2 className="animate-spin" size={20} /> Auditing...</>
-              ) : (
-                <><Play size={20} /> Run Audit</>
-              )}
+              {isProcessing ? <><Loader2 className="animate-spin" size={16} /> Auditing...</> : <><Zap size={16} /> Run Audit</>}
             </button>
           </div>
-
-          {results.length > 0 && (
-            <div className={`p-6 rounded-2xl shadow-xl border space-y-6 ${cardClasses}`}>
-              <div>
-                <h4 className="text-[10px] uppercase font-black text-slate-500 tracking-widest mb-4">
-                  <FileText size={12}/> Analysis Stats
-                </h4>
-                <div className="grid grid-cols-2 gap-3">
-                  <div className={`${isDark ? 'bg-slate-950' : 'bg-slate-50'} p-3 rounded-xl border border-slate-800`}>
-                    <p className="text-[9px] text-slate-500 uppercase font-bold">Total</p>
-                    <p className="text-xl font-black">{stats.total}</p>
-                  </div>
-                  <div className={`${isDark ? 'bg-slate-950' : 'bg-slate-50'} p-3 rounded-xl border border-slate-800`}>
-                    <p className="text-[9px] text-slate-500 uppercase font-bold">Processed</p>
-                    <p className="text-xl font-black text-emerald-400">{stats.processed}</p>
-                  </div>
-                </div>
-              </div>
-
-              <div>
-                <h4 className="text-[10px] uppercase font-black text-slate-500 tracking-widest flex items-center gap-2 mb-3">
-                  <Cloud size={12}/> Provider Intelligence
-                </h4>
-                <div className="space-y-2">
-                  {stats.providers.map((p) => (
-                    <button
-                      key={p.name}
-                      onClick={() => toggleProviderFilter(p.name)}
-                      className={`w-full group flex items-center justify-between p-3 rounded-xl border transition-all text-left ${
-                        filterProvider === p.name 
-                          ? 'bg-rose-500/20 border-rose-500/40 ring-1 ring-rose-500/20' 
-                          : `${isDark ? 'bg-slate-950 border-slate-800' : 'bg-white border-slate-100'} hover:border-slate-700`
-                      }`}
-                    >
-                      <div className="flex items-center gap-2 min-w-0">
-                        <div className={`w-1.5 h-1.5 rounded-full shrink-0 ${filterProvider === p.name ? 'bg-rose-500 shadow-[0_0_8px_rgba(244,63,94,0.6)]' : 'bg-slate-700'}`} />
-                        <p className={`text-xs font-bold truncate ${filterProvider === p.name ? 'text-rose-400' : (isDark ? 'text-slate-400 group-hover:text-slate-200' : 'text-slate-600 group-hover:text-slate-900')}`}>
-                          {p.name}
-                        </p>
-                      </div>
-                      <span className={`text-[10px] font-black px-2 py-0.5 rounded-md ${
-                        filterProvider === p.name ? 'bg-rose-500 text-white' : (isDark ? 'bg-slate-800 text-slate-500 group-hover:text-slate-400' : 'bg-slate-100 text-slate-500 group-hover:text-slate-700')
-                      }`}>
-                        {p.count}
-                      </span>
-                    </button>
-                  ))}
-                  {stats.providers.length === 0 && (
-                    <p className="text-[10px] text-slate-600 italic">No providers detected yet.</p>
-                  )}
-                </div>
-              </div>
-            </div>
-          )}
         </div>
 
-        {/* Results Pane */}
-        <div className="lg:col-span-3 flex flex-col gap-4">
-          <div className="flex flex-col md:flex-row gap-4 items-center">
-            <div className="relative flex-1 w-full">
-              <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-600" size={16} />
-              <input
-                type="text"
-                placeholder="Filter results by domain or server name..."
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-                className={`w-full pl-10 pr-4 py-2 rounded-xl focus:ring-2 focus:ring-rose-500 outline-none text-sm transition-all ${inputClasses}`}
-              />
+        <div className="lg:col-span-8 flex flex-col gap-4 animate-in slide-in-from-right-4 duration-500">
+          <div className={`rounded-3xl border shadow-2xl overflow-hidden min-h-[400px] flex flex-col ${cardClasses}`}>
+            <div className={`p-5 border-b flex flex-col sm:flex-row gap-4 items-center justify-between ${isDark ? 'bg-[#05080f] border-[#1e293b]' : 'bg-slate-50 border-slate-100'}`}>
+               <div className="relative flex-1 max-w-md w-full">
+                  <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-500" size={14} />
+                  <input type="text" placeholder="Filter audit matrix..." value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)} className={`w-full pl-9 pr-4 py-2 border rounded-lg outline-none text-xs font-bold ${inputClasses}`} />
+               </div>
             </div>
-            {filterProvider && (
-              <div className="flex items-center gap-2 px-3 py-1.5 bg-rose-500/10 border border-rose-500/20 rounded-xl animate-in zoom-in-95 duration-200">
-                <Filter size={14} className="text-rose-400" />
-                <span className="text-xs font-bold text-rose-400">Provider: {filterProvider}</span>
-                <button 
-                  onClick={() => setFilterProvider(null)}
-                  className="p-0.5 hover:bg-rose-500/20 rounded text-rose-400 transition-colors"
-                >
-                  <X size={14} />
-                </button>
-              </div>
-            )}
-          </div>
-
-          <div className="space-y-4">
-            {filteredResults.map((res, idx) => (
-              <div key={idx} className={`rounded-2xl border overflow-hidden shadow-lg transition-all hover:border-slate-700 animate-in slide-in-from-bottom-2 duration-300 ${cardClasses}`}>
-                <div className={`${isDark ? 'bg-slate-950/50 border-slate-800' : 'bg-slate-50 border-slate-100'} p-4 border-b flex items-center justify-between`}>
-                  <div className="flex items-center gap-3">
-                    <div className={`w-2 h-2 rounded-full ${
-                      res.status === 'success' ? 'bg-emerald-500 animate-pulse' : 
-                      res.status === 'not_found' ? 'bg-rose-500' : 'bg-slate-700'
-                    }`} />
-                    <h3 className="font-bold">{res.domain}</h3>
-                    {res.records.length > 0 && (
-                      <span className={`text-[9px] font-black uppercase tracking-widest px-2 py-0.5 rounded-md border ${isDark ? 'bg-slate-800 text-slate-400 border-slate-700' : 'bg-slate-100 text-slate-500 border-slate-200'}`}>
-                        {res.records[0].provider}
-                      </span>
-                    )}
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <button 
-                      onClick={() => copyToClipboard(res, idx)}
-                      className="p-1.5 text-slate-500 hover:text-white transition-colors"
-                      title="Copy Records"
-                    >
-                      {copiedIndex === idx ? <Check size={16} className="text-emerald-400" /> : <Copy size={16} />}
-                    </button>
-                    <a 
-                      href={`https://mxtoolbox.com/SuperTool.aspx?action=mx%3a${res.domain}`}
-                      target="_blank"
-                      className="p-1.5 text-slate-500 hover:text-white transition-colors"
-                    >
-                      <ExternalLink size={16} />
-                    </a>
-                  </div>
-                </div>
-                <div className="p-0">
-                  {res.status === 'loading' && (
-                    <div className="p-12 flex flex-col items-center justify-center gap-3">
-                      <Loader2 className="animate-spin text-rose-500" size={32} />
-                      <p className="text-xs text-slate-500 font-bold uppercase">Querying DNS...</p>
-                    </div>
-                  )}
-                  {res.status === 'not_found' && (
-                    <div className="p-8 flex items-center gap-4 bg-rose-500/5">
-                      <AlertTriangle className="text-rose-400" size={24} />
-                      <div>
-                        <p className="text-sm font-bold text-rose-400">No MX Records Found</p>
-                        <p className="text-xs text-slate-500">Domain may not be configured to receive emails.</p>
+            <div className="flex-1 overflow-auto custom-scrollbar">
+              {results.length > 0 ? (
+                <div className="divide-y divide-slate-800/50">
+                  {filteredResults.map((res, idx) => (
+                    <div key={idx} className="group">
+                      <div className={`${isDark ? 'bg-slate-950/20' : 'bg-slate-50/50'} p-4 flex items-center justify-between border-b border-slate-800/30`}>
+                        <div className="flex items-center gap-3">
+                          <div className={`w-2 h-2 rounded-full ${res.status === 'success' ? 'bg-emerald-500' : 'bg-rose-500'}`} />
+                          <h3 className={`font-black tracking-tight text-sm ${isDark ? 'text-white' : 'text-slate-900'}`}>{res.domain}</h3>
+                        </div>
+                        <button onClick={() => copyToClipboard(res, idx)} className="p-1.5 text-slate-500 hover:text-rose-400 transition-colors">
+                          {copiedIndex === idx ? <Check size={16} className="text-emerald-400" /> : <Copy size={16} />}
+                        </button>
                       </div>
+                      {res.status === 'loading' ? (
+                        <div className="p-10 flex justify-center"><Loader2 className="animate-spin text-rose-500" /></div>
+                      ) : res.status === 'success' ? (
+                        <table className="w-full text-left">
+                          <thead className={`${isDark ? 'bg-slate-950/50' : 'bg-slate-100/50'}`}>
+                            <tr className="text-[9px] font-black uppercase tracking-widest text-slate-500">
+                              <th className="px-6 py-2 w-20 text-center">Priority</th>
+                              <th className="px-6 py-2">MX Exchange Server</th>
+                              <th className="px-6 py-2">Provider Node</th>
+                            </tr>
+                          </thead>
+                          <tbody className={`divide-y ${isDark ? 'divide-slate-800/30' : 'divide-slate-100'}`}>
+                            {res.records.map((rec, rIdx) => (
+                              <tr key={rIdx} className="hover:bg-rose-500/5 transition-colors">
+                                <td className={`px-6 py-3 text-center text-xs font-mono font-black ${isDark ? 'text-slate-400' : 'text-slate-600'}`}>{rec.priority}</td>
+                                <td className={`px-6 py-3 text-[11px] font-mono font-bold ${isDark ? 'text-slate-200' : 'text-slate-800'}`}>{rec.exchange}</td>
+                                <td className="px-6 py-3">
+                                  <span className={`text-[9px] font-black px-2 py-0.5 rounded border uppercase tracking-widest ${isDark ? 'bg-rose-500/10 text-rose-400 border-rose-500/20' : 'bg-rose-50 text-rose-600 border-rose-200'}`}>
+                                    {rec.provider}
+                                  </span>
+                                </td>
+                              </tr>
+                            ))}
+                          </tbody>
+                        </table>
+                      ) : (
+                        <div className="p-6 text-xs text-slate-600 font-bold italic tracking-wide opacity-50">No identified hosting infrastructure.</div>
+                      )}
                     </div>
-                  )}
-                  {res.status === 'success' && (
-                    <table className="w-full text-left">
-                      <thead className={`${isDark ? 'bg-slate-900/50' : 'bg-slate-100'}`}>
-                        <tr>
-                          <th className="px-6 py-2 text-[10px] font-black text-slate-600 uppercase tracking-widest w-20 text-center">Priority</th>
-                          <th className="px-6 py-2 text-[10px] font-black text-slate-600 uppercase tracking-widest">Mail Server</th>
-                          <th className="px-6 py-2 text-[10px] font-black text-slate-600 uppercase tracking-widest">Provider</th>
-                        </tr>
-                      </thead>
-                      <tbody className={`divide-y ${isDark ? 'divide-slate-800' : 'divide-slate-100'}`}>
-                        {res.records.map((rec, rIdx) => (
-                          <tr key={rIdx} className="hover:bg-slate-500/5 transition-colors">
-                            <td className="px-6 py-3 text-center">
-                              <span className={`text-xs font-black font-mono ${
-                                rec.priority === 0 ? 'text-emerald-400' : 
-                                rec.priority < 10 ? 'text-sky-400' : 'text-slate-500'
-                              }`}>
-                                {rec.priority}
-                              </span>
-                            </td>
-                            <td className="px-6 py-3">
-                              <code className={`text-[11px] font-mono ${isDark ? 'text-slate-200' : 'text-slate-700'}`}>{rec.exchange}</code>
-                            </td>
-                            <td className="px-6 py-3">
-                              <span className={`text-[10px] font-bold px-2 py-0.5 rounded border uppercase tracking-tighter ${
-                                rec.provider !== 'Custom / Private' 
-                                ? 'bg-rose-500/10 text-rose-400 border-rose-500/20' 
-                                : (isDark ? 'bg-slate-800/50 text-slate-600 border-slate-800' : 'bg-slate-100 text-slate-400 border-slate-200')
-                              }`}>
-                                {rec.provider}
-                              </span>
-                            </td>
-                          </tr>
-                        ))}
-                      </tbody>
-                    </table>
-                  )}
+                  ))}
                 </div>
-              </div>
-            ))}
-
-            {filteredResults.length === 0 && results.length > 0 && !isProcessing && (
-              <div className={`flex flex-col items-center justify-center py-24 rounded-3xl border border-dashed text-slate-600 ${isDark ? 'bg-slate-900/50 border-slate-800' : 'bg-slate-50 border-slate-200'}`}>
-                <Filter size={48} strokeWidth={1} className="mb-4" />
-                <p className="text-sm font-medium">No results matching active filters</p>
-                <button 
-                  onClick={() => {setSearchQuery(''); setFilterProvider(null);}}
-                  className="mt-4 text-xs font-bold text-rose-400 uppercase tracking-widest hover:text-rose-300 transition-colors"
-                >
-                  Clear all filters
-                </button>
-              </div>
-            )}
-
-            {results.length === 0 && !isProcessing && (
-              <div className={`flex flex-col items-center justify-center py-24 rounded-3xl border border-dashed text-slate-600 ${isDark ? 'bg-slate-900/50 border-slate-800' : 'bg-slate-50 border-slate-200'}`}>
-                <Mail size={48} strokeWidth={1} className="mb-4" />
-                <p className="text-sm font-medium">Analysis results will appear here</p>
-                <p className="text-[10px] uppercase font-black mt-2 tracking-widest opacity-50">Enter domain list to begin</p>
-              </div>
-            )}
+              ) : (
+                <div className="py-32 text-center text-slate-500 uppercase font-black text-xs tracking-widest opacity-20">No Data Analyzed</div>
+              )}
+            </div>
           </div>
         </div>
       </div>
-
-      {/* Footer Branding */}
-      <footer className={`mt-auto pt-8 border-t flex justify-between items-center text-[10px] font-black text-slate-600 uppercase tracking-widest ${isDark ? 'border-slate-800' : 'border-slate-200'}`}>
-        <p>&copy; {new Date().getFullYear()} Authenticator Pro • MX Engine v2.0</p>
-        <div className="flex gap-4">
-          <a href="#" className="hover:text-slate-400">Security Audit</a>
-          <a href="#" className="hover:text-slate-400">API Docs</a>
-        </div>
-      </footer>
     </div>
   );
 };

@@ -1,4 +1,3 @@
-
 import React, { useState } from 'react';
 import { 
   Search, 
@@ -13,18 +12,19 @@ import {
   ShieldCheck,
   ShieldAlert,
   HelpCircle,
-  ExternalLink
+  ExternalLink,
+  Zap,
+  // Added Globe import to fix "Cannot find name 'Globe'" error on line 164
+  Globe
 } from 'lucide-react';
 import { CaaResult } from '../types';
 import { lookupCaaRecords } from '../services/dnsService';
 
-// Added theme to CaaToolProps interface
 interface CaaToolProps {
   onBack: () => void;
   theme: 'dark' | 'light';
 }
 
-// Updated component to accept theme and handle conditional styles
 const CaaTool: React.FC<CaaToolProps> = ({ onBack, theme }) => {
   const isDark = theme === 'dark';
   const [domainInput, setDomainInput] = useState('');
@@ -48,223 +48,132 @@ const CaaTool: React.FC<CaaToolProps> = ({ onBack, theme }) => {
         status: records.length > 0 ? 'secure' : 'open'
       });
     } catch (err) {
-      setError('Unable to fetch CAA records. Please verify the domain and try again.');
+      setError('Unable to fetch records. Please verify the domain.');
     } finally {
       setIsLoading(false);
     }
   };
 
-  const clear = () => {
-    setDomainInput('');
-    setResult(null);
-    setError(null);
-  };
-
   const cardClasses = isDark ? 'bg-slate-900 border-slate-800 text-slate-100' : 'bg-white border-slate-200 text-slate-900';
-  const inputClasses = isDark ? 'bg-slate-950 border-slate-800 text-slate-200' : 'bg-slate-50 border-slate-200 text-slate-900';
+  const inputClasses = isDark ? 'bg-slate-950 border-slate-800 text-slate-200 focus:border-teal-500' : 'bg-slate-50 border-slate-200 text-slate-900 focus:border-teal-600';
 
   return (
-    <div className="min-h-screen p-4 md:p-8 flex flex-col gap-6 max-w-7xl mx-auto animate-in fade-in duration-500">
-      {/* Header */}
-      <header className={`flex flex-col md:flex-row md:items-center justify-between gap-4 p-6 rounded-2xl shadow-xl border ${cardClasses}`}>
+    <div className="min-h-screen px-4 pt-3 pb-8 md:px-8 md:pt-4 md:pb-8 flex flex-col gap-6 max-w-7xl mx-auto animate-in fade-in duration-500">
+      <header className={`flex flex-col md:flex-row md:items-center justify-between gap-4 p-5 rounded-3xl shadow-xl border ${cardClasses}`}>
         <div className="flex items-center gap-4">
-          <button 
-            onClick={onBack}
-            className={`p-2 rounded-xl transition-all border ${isDark ? 'bg-slate-800 border-slate-700 text-slate-400 hover:text-white hover:bg-slate-700' : 'bg-slate-100 border-slate-200 text-slate-600 hover:bg-slate-200'}`}
-          >
+          <button onClick={onBack} className={`p-2 rounded-xl border transition-all ${isDark ? 'bg-slate-800 border-slate-700 text-slate-400 hover:text-white' : 'bg-slate-100 border-slate-200 text-slate-600'}`}>
             <ArrowLeft size={20} />
           </button>
           <div className="flex items-center gap-3">
-            <div className="bg-teal-500 p-2.5 rounded-xl text-white shadow-lg shadow-teal-500/20">
+            <div className="bg-teal-500 p-2.5 rounded-xl text-white shadow-lg">
               <FileCheck size={28} />
             </div>
             <div>
-              <h1 className="text-xl md:text-2xl font-bold tracking-tight">CAA Record Checker</h1>
-              <p className="text-slate-400 text-xs md:text-sm">Certificate Authority Authorization Policy</p>
+              <h1 className="text-xl md:text-2xl font-black tracking-tight text-teal-400 uppercase">CAA Checker</h1>
+              <p className="text-slate-500 text-[10px] font-black uppercase tracking-widest opacity-60">Certificate Authority Logic Node</p>
             </div>
           </div>
         </div>
         {result && (
-          <button onClick={clear} className="px-4 py-2 bg-rose-500/10 text-rose-400 hover:bg-rose-500/20 rounded-lg text-sm font-bold transition-all border border-rose-500/20 flex items-center gap-2">
-            <Trash2 size={16} /> Reset
+          <button onClick={() => { setResult(null); setDomainInput(''); }} className="px-4 py-2 bg-rose-500/10 text-rose-400 hover:bg-rose-500/20 rounded-lg text-xs font-black uppercase tracking-widest transition-all border border-rose-500/20 flex items-center gap-2">
+            <Trash2 size={14} /> Clear Result
           </button>
         )}
       </header>
 
-      {/* Main Grid */}
-      <div className="grid grid-cols-1 lg:grid-cols-4 gap-6">
-        {/* Input Card */}
-        <div className="lg:col-span-1 flex flex-col gap-6">
-          <div className={`p-6 rounded-2xl shadow-xl border flex flex-col gap-6 ${cardClasses}`}>
+      <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
+        <div className="lg:col-span-4 flex flex-col gap-6">
+          <div className={`p-6 rounded-3xl shadow-xl border flex flex-col gap-6 ${cardClasses}`}>
             <div>
-              <label className="block text-sm font-semibold mb-2">Check Domain</label>
-              <div className="relative">
-                <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-700" size={16} />
-                <input
-                  type="text"
-                  value={domainInput}
-                  onChange={(e) => setDomainInput(e.target.value)}
-                  onKeyDown={(e) => e.key === 'Enter' && handleLookup()}
-                  placeholder="e.g. apple.com"
-                  className={`w-full pl-10 pr-4 py-3 rounded-xl focus:ring-2 focus:ring-teal-500 focus:border-transparent outline-none transition-all font-medium placeholder:text-slate-400 ${inputClasses}`}
-                />
-              </div>
+              <label className={`block text-[10px] font-black uppercase tracking-widest mb-3 ${isDark ? 'text-slate-500' : 'text-slate-600'}`}>Check Domain</label>
+              <input
+                type="text"
+                value={domainInput}
+                onChange={(e) => setDomainInput(e.target.value)}
+                onKeyDown={(e) => e.key === 'Enter' && handleLookup()}
+                placeholder="e.g. apple.com"
+                className={`w-full p-4 rounded-2xl outline-none font-bold text-sm transition-all border ${inputClasses}`}
+              />
             </div>
-
             <button
               onClick={handleLookup}
-              disabled={isLoading || !domainInput}
-              className="w-full flex items-center justify-center gap-2 py-4 bg-teal-600 hover:bg-teal-500 disabled:bg-slate-800 disabled:text-slate-600 text-white rounded-xl transition-all shadow-lg shadow-teal-500/10 font-bold"
+              disabled={isLoading || !domainInput.trim()}
+              className="w-full flex items-center justify-center gap-3 py-4 bg-teal-600 hover:bg-teal-500 disabled:opacity-50 text-white rounded-2xl transition-all shadow-lg font-black uppercase text-[10px] tracking-widest"
             >
-              {isLoading ? (
-                <><Loader2 className="animate-spin" size={20} /> Querying DNS...</>
-              ) : (
-                <><Play size={20} /> Run Audit</>
-              )}
+              {isLoading ? <Loader2 className="animate-spin" size={16} /> : <Zap size={16} />} 
+              {isLoading ? 'Scanning Matrix...' : 'Run Audit'}
             </button>
-
-            <div className={`p-4 rounded-xl border ${isDark ? 'bg-slate-950 border-slate-800/50' : 'bg-slate-50 border-slate-100'}`}>
-              <h4 className="text-[10px] uppercase font-black text-slate-500 tracking-widest mb-3 flex items-center gap-1.5">
-                <Info size={12}/> Security Note
-              </h4>
-              <p className="text-[11px] text-slate-500 leading-relaxed">
-                If no CAA records exist, any Certificate Authority is technically allowed to issue a certificate for your domain.
-              </p>
-            </div>
           </div>
         </div>
 
-        {/* Results Area */}
-        <div className="lg:col-span-3">
-          {isLoading ? (
-            <div className={`h-full min-h-[400px] flex flex-col items-center justify-center rounded-3xl border border-dashed ${isDark ? 'bg-slate-900/50 border-slate-800' : 'bg-slate-50 border-slate-200'}`}>
-               <Loader2 className="animate-spin text-teal-500 mb-4" size={48} />
-               <p className="text-slate-400 font-medium animate-pulse">Scanning DNS for CAA records...</p>
-            </div>
-          ) : error ? (
-            <div className={`h-full min-h-[400px] flex flex-col items-center justify-center rounded-3xl border px-8 text-center ${isDark ? 'bg-slate-900/50 border-rose-500/20' : 'bg-rose-50 border-rose-100'}`}>
-               <AlertTriangle className="text-rose-500 mb-4" size={48} />
-               <h3 className="text-xl font-bold mb-2">Lookup Failed</h3>
-               <p className="text-slate-500 text-sm max-w-sm">{error}</p>
-            </div>
-          ) : result ? (
-            <div className="space-y-6 animate-in slide-in-from-right-4 duration-500">
-              {/* Posture Card */}
-              <div className={`p-6 rounded-3xl border flex items-center justify-between shadow-xl ${
-                result.status === 'secure' 
-                  ? 'bg-teal-500/10 border-teal-500/20' 
-                  : 'bg-amber-500/10 border-amber-500/20'
-              }`}>
-                <div className="flex items-center gap-4">
-                   <div className={`p-3 rounded-2xl ${
-                     result.status === 'secure' ? 'bg-teal-500/20 text-teal-400' : 'bg-amber-500/20 text-amber-400'
-                   }`}>
-                     {result.status === 'secure' ? <ShieldCheck size={32} /> : <ShieldAlert size={32} />}
-                   </div>
-                   <div>
-                     <h2 className="text-xl font-bold">
-                       {result.status === 'secure' ? 'Policy Restricted' : 'Global Access'}
-                     </h2>
-                     <p className="text-slate-400 text-sm">
-                       {result.status === 'secure' 
-                         ? `Only specific authorities can issue certificates for ${result.domain}.` 
-                         : `All certificate authorities are allowed to issue for ${result.domain}.`}
-                     </p>
-                   </div>
-                </div>
-                <div className="hidden md:block">
-                   <span className={`px-4 py-2 rounded-full text-xs font-black uppercase tracking-widest ${
-                     result.status === 'secure' ? 'bg-teal-500 text-white' : 'bg-amber-500 text-white'
-                   }`}>
-                     {result.status === 'secure' ? 'Controlled' : 'Standard'}
-                   </span>
-                </div>
+        <div className="lg:col-span-8 flex flex-col gap-4 animate-in slide-in-from-right-4 duration-500">
+          <div className={`rounded-[2rem] border shadow-2xl overflow-hidden min-h-[400px] flex flex-col ${cardClasses}`}>
+            <div className={`p-5 border-b flex items-center justify-between ${isDark ? 'bg-slate-950/50 border-slate-800' : 'bg-slate-50 border-slate-100'}`}>
+              <div className="flex items-center gap-3">
+                 <ShieldCheck size={16} className="text-teal-400" />
+                 <h2 className="text-[10px] font-black uppercase tracking-widest">Authorized Issuers Matrix</h2>
               </div>
+              {result && (
+                <span className={`px-2 py-0.5 rounded text-[9px] font-black uppercase tracking-widest border ${result.records.length > 0 ? 'bg-emerald-500/10 text-emerald-500 border-emerald-500/20' : 'bg-amber-500/10 text-amber-500 border-amber-500/20'}`}>
+                  {result.records.length > 0 ? 'RESTRICTED' : 'OPEN'}
+                </span>
+              )}
+            </div>
 
-              {/* Table Card */}
-              <div className={`rounded-3xl border shadow-xl overflow-hidden ${cardClasses}`}>
+            <div className="flex-1 overflow-auto custom-scrollbar">
+              {isLoading ? (
+                <div className="h-full flex flex-col items-center justify-center gap-4 py-24">
+                  <Loader2 className="animate-spin text-teal-500" size={32} />
+                  <p className="text-[10px] font-black uppercase tracking-widest text-slate-500 animate-pulse">Querying DNS Records...</p>
+                </div>
+              ) : result && result.records.length > 0 ? (
                 <table className="w-full text-left">
                   <thead>
-                    <tr className={`${isDark ? 'bg-slate-950/50 border-slate-800' : 'bg-slate-100 border-slate-200'} border-b`}>
-                      <th className="px-6 py-4 text-xs font-black text-slate-500 uppercase tracking-widest w-20 text-center">Flag</th>
-                      <th className="px-6 py-4 text-xs font-black text-slate-500 uppercase tracking-widest w-32">Tag</th>
-                      <th className="px-6 py-4 text-xs font-black text-slate-500 uppercase tracking-widest">Authorized CA / Value</th>
-                      <th className="px-6 py-4 text-xs font-black text-slate-500 uppercase tracking-widest">Impact</th>
+                    <tr className={`${isDark ? 'bg-slate-950/80 text-slate-400' : 'bg-slate-100 text-slate-500'} border-b border-slate-800/50 text-[10px] font-black uppercase tracking-widest`}>
+                      <th className="px-8 py-4 w-24">Flag</th>
+                      <th className="px-8 py-4 w-32">Tag</th>
+                      <th className="px-8 py-4">Authorized CA</th>
                     </tr>
                   </thead>
-                  <tbody className={`divide-y ${isDark ? 'divide-slate-800' : 'divide-slate-100'}`}>
-                    {result.records.length > 0 ? (
-                      result.records.map((rec, idx) => (
-                        <tr key={idx} className="hover:bg-slate-500/5 transition-colors">
-                          <td className="px-6 py-4 text-center">
-                            <span className={`px-2 py-0.5 rounded font-mono text-xs ${
-                              rec.flag === 128 ? 'bg-rose-500/10 text-rose-500 font-bold' : 'bg-slate-800 text-slate-400'
-                            }`} title={rec.flag === 128 ? 'Critical: CAs must understand this tag to issue' : 'Standard'}>
-                              {rec.flag}
-                            </span>
-                          </td>
-                          <td className="px-6 py-4">
-                            <span className="text-sm font-bold uppercase tracking-tighter">
-                              {rec.tag}
-                            </span>
-                          </td>
-                          <td className="px-6 py-4">
-                            <code className="text-[11px] font-mono text-teal-400 font-bold">
-                              {rec.value}
-                            </code>
-                          </td>
-                          <td className="px-6 py-4">
-                            <p className="text-xs text-slate-400">
-                              {rec.description}
-                            </p>
-                          </td>
-                        </tr>
-                      ))
-                    ) : (
-                      <tr>
-                        <td colSpan={4} className="px-6 py-12 text-center">
-                           <div className="flex flex-col items-center gap-2 text-slate-600">
-                             <HelpCircle size={32} strokeWidth={1} />
-                             <p className="text-sm font-medium italic">No CAA records found for {result.domain}.</p>
-                             <p className="text-[10px] uppercase font-black tracking-widest opacity-50">RFC 6844 behavior: Implicit allow all</p>
-                           </div>
+                  <tbody className={`divide-y ${isDark ? 'divide-slate-800/50' : 'divide-slate-100'}`}>
+                    {result.records.map((rec, idx) => (
+                      <tr key={idx} className="hover:bg-teal-500/5 transition-colors">
+                        <td className="px-8 py-5">
+                          <code className={`px-2 py-1 rounded bg-slate-950/50 border border-slate-800 text-[10px] font-mono font-bold ${isDark ? 'text-teal-400' : 'text-teal-700'}`}>
+                            {rec.flag}
+                          </code>
+                        </td>
+                        <td className="px-8 py-5">
+                           <span className="text-[10px] font-black uppercase tracking-widest text-slate-500">{rec.tag}</span>
+                        </td>
+                        <td className="px-8 py-5">
+                          <span className={`text-sm font-black tracking-tight ${isDark ? 'text-slate-100' : 'text-slate-900'}`}>{rec.value}</span>
                         </td>
                       </tr>
-                    )}
+                    ))}
                   </tbody>
                 </table>
-              </div>
-
-              {/* Tag Glossary */}
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-                {[
-                  { tag: 'issue', desc: 'Grants authority to issue any type of certificate.' },
-                  { tag: 'issuewild', desc: 'Specific authority for wildcard (*.domain) certs.' },
-                  { tag: 'iodef', desc: 'Incident reporting URI for CA policy violations.' }
-                ].map((item) => (
-                  <div key={item.tag} className={`p-4 rounded-2xl border ${isDark ? 'bg-slate-900/50 border-slate-800/50' : 'bg-slate-50 border-slate-100'}`}>
-                    <p className="text-[10px] font-black text-slate-600 uppercase tracking-widest mb-1">{item.tag}</p>
-                    <p className="text-xs text-slate-400 leading-snug">{item.desc}</p>
+              ) : result && result.records.length === 0 ? (
+                <div className="h-full flex flex-col items-center justify-center py-24 px-12 text-center gap-4 opacity-50">
+                  <ShieldAlert size={48} className="text-amber-500" />
+                  <div className="space-y-1">
+                    <p className="text-xs font-black uppercase tracking-widest text-white">No CAA Records Identified</p>
+                    <p className="text-[10px] font-bold text-slate-500 max-w-sm">Any Certificate Authority is currently allowed to issue certificates for this domain.</p>
                   </div>
-                ))}
-              </div>
+                </div>
+              ) : (
+                <div className="h-full flex flex-col items-center justify-center py-24 opacity-20">
+                  <Globe size={64} strokeWidth={1} />
+                  <p className="text-[10px] font-black uppercase tracking-[0.4em] mt-4">Awaiting Domain Analysis</p>
+                </div>
+              )}
             </div>
-          ) : (
-            <div className={`h-full min-h-[400px] flex flex-col items-center justify-center rounded-3xl border border-dashed text-slate-700 ${isDark ? 'bg-slate-900/50 border-slate-800' : 'bg-slate-50 border-slate-200'}`}>
-               <FileCheck size={64} strokeWidth={1} className="mb-4" />
-               <p className="text-sm font-medium">Analyze domain certificate authority policy</p>
-            </div>
-          )}
+          </div>
         </div>
       </div>
-
-      {/* Footer */}
-      <footer className={`mt-auto pt-8 border-t flex justify-between items-center text-[10px] font-black text-slate-600 uppercase tracking-widest ${isDark ? 'border-slate-800' : 'border-slate-200'}`}>
-        <p>&copy; {new Date().getFullYear()} Authenticator Pro • CAA Audit Engine</p>
-        <div className="flex gap-4">
-          <a href="https://dns.google/" target="_blank" className="hover:text-slate-400 inline-flex items-center gap-1">Google DNS API <ExternalLink size={10}/></a>
-          <a href="#" className="hover:text-slate-400">Policy Guide</a>
-        </div>
+      
+      <footer className={`shrink-0 pt-6 border-t flex justify-between items-center text-[10px] font-black text-slate-600 uppercase tracking-widest ${isDark ? 'border-slate-800' : 'border-slate-200'}`}>
+        <p>&copy; {new Date().getFullYear()} Email Sparks Intelligence Node</p>
       </footer>
     </div>
   );
