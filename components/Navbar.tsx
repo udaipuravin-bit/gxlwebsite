@@ -49,7 +49,7 @@ const Navbar: React.FC<NavbarProps> = ({ onNavigate, theme, onToggleTheme }) => 
       { id: 'spamhaus-checker', name: 'Spamhaus Checker', icon: <ShieldAlert size={16} />, color: 'text-rose-500' },
       { id: 'dkim-checker', name: 'DKIM Checker', icon: <ShieldCheck size={16} />, color: 'text-emerald-400' },
       { id: 'spf-validator', name: 'SPF Checker', icon: <Globe size={16} />, color: 'text-amber-400' },
-      { id: 'dmarc-checker', name: 'DMARC Logic', icon: <BarChart3 size={16} />, color: 'text-sky-400' },
+      { id: 'dmarc-checker', name: 'DMARC Checker', icon: <BarChart3 size={16} />, color: 'text-sky-400' },
       { id: 'caa-checker', name: 'CAA Checker', icon: <ShieldCheck size={16} />, color: 'text-teal-400' },
     ],
     infrastructure: [

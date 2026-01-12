@@ -67,6 +67,7 @@ const Home: React.FC<HomeProps> = ({ theme, onNavigate }) => {
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
           <ToolCard theme={theme} onClick={() => onNavigate('bulk-blacklist')} icon={<LayoutGrid size={32} />} title="Blacklist Checker" desc="Comprehensive multi-mode DNSBL audit engine for bulk IPs and Domains." colorClass="text-indigo-500" />
           <ToolCard theme={theme} onClick={() => onNavigate('spamhaus-checker')} icon={<ShieldAlert size={32} />} title="Spamhaus Checker" desc="Direct DQS zone reputation audit with forensic data datasets." colorClass="text-rose-500" />
+          <ToolCard theme={theme} onClick={() => onNavigate('selector-auditor')} icon={<SearchCheck size={32} />} title="Selector Auditor" desc="Cross-reference domains against specific selectors with deep MIME integration." colorClass="text-orange-500" />
         </div>
       </section>
 
@@ -83,7 +84,7 @@ const Home: React.FC<HomeProps> = ({ theme, onNavigate }) => {
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
           <ToolCard theme={theme} onClick={() => onNavigate('dkim-checker')} icon={<ShieldCheck size={32} />} title="DKIM Checker" desc="Recursive multi-selector key search and discovery for any hostname." colorClass="text-emerald-400" />
           <ToolCard theme={theme} onClick={() => onNavigate('spf-validator')} icon={<Globe size={32} />} title="SPF Checker" desc="Detailed logic validation and recursive include depth lookup count." colorClass="text-amber-400" />
-          <ToolCard theme={theme} onClick={() => onNavigate('dmarc-checker')} icon={<FileText size={32} />} title="DMARC Logic" desc="Domain policy compliance, alignment audit, and reporting syntax." colorClass="text-sky-400" />
+          <ToolCard theme={theme} onClick={() => onNavigate('dmarc-checker')} icon={<FileText size={32} />} title="DMARC Checker" desc="Domain policy compliance, alignment audit, and reporting syntax." colorClass="text-sky-400" />
           <ToolCard theme={theme} onClick={() => onNavigate('caa-checker')} icon={<FileCheck size={32} />} title="CAA Checker" desc="Certificate authority authorization policy and security lookup." colorClass="text-teal-400" />
         </div>
       </section>

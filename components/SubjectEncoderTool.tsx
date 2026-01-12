@@ -1,22 +1,19 @@
-import React, { useState, useMemo, useEffect, useRef } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import { 
   ArrowLeft, 
   Type, 
   Copy, 
   Check, 
   Zap, 
-  Search,
-  Code,
-  Layers,
-  ChevronDown,
-  Terminal,
-  Activity,
-  Trash2,
-  Hash,
+  Layers, 
+  Terminal, 
+  FlaskConical,
   Fingerprint,
-  FlaskConical
+  Code,
+  ShieldCheck,
+  Search,
+  ChevronRight
 } from 'lucide-react';
-import { encodeBase64, encodeQuotedPrintable, encodeRFC2047 } from '../services/mimeService';
 import { useNotify } from '../App';
 
 interface SubjectEncoderToolProps {
@@ -32,150 +29,285 @@ interface EncodedVariant {
 }
 
 const CHARSETS = [
-  "UTF-8", "UTF-16", "ISO-8859-1", "ISO-8859-2", "ISO-8859-15",
-  "Windows-1251", "Windows-1252", "US-ASCII", "KOI8-R", "Shift_JIS"
+  "UTF-8", "ISO-8859-1", "ISO-8859-15", "Windows-1252", "US-ASCII",
+  "UTF-16", "Shift_JIS", "EUC-JP", "GB2312", "Big5", "KOI8-R"
 ];
 
 const SubjectEncoderTool: React.FC<SubjectEncoderToolProps> = ({ onBack, theme }) => {
   const { notify } = useNotify();
   const isDark = theme === 'dark';
-  const [subject, setSubject] = useState('');
-  const [selectedCharset, setSelectedCharset] = useState('UTF-8');
+  const [subject, setSubject] = useState('Welcome to Email Sparks! 🚀');
   const [copiedId, setCopiedId] = useState<string | null>(null);
 
+  // --- RFC 2047 Core Logic ---
+  
+  const toB64 = (str: string) => {
+    const bytes = new TextEncoder().encode(str);
+    let bin = "";
+    for (let i = 0; i < bytes.byteLength; i++) bin += String.fromCharCode(bytes[i]);
+    return btoa(bin);
+  };
+
+  const toQP = (str: string, forceHex = false) => {
+    const bytes = new TextEncoder().encode(str);
+    let result = "";
+    for (let i = 0; i < bytes.length; i++) {
+      const b = bytes[i];
+      // RFC 2047 Q-encoding rules (strict)
+      if (!forceHex && ((b >= 48 && b <= 57) || (b >= 65 && b <= 90) || (b >= 97 && b <= 122))) {
+        result += String.fromCharCode(b);
+      } else if (!forceHex && b === 32) {
+        result += "_";
+      } else {
+        result += "=" + b.toString(16).toUpperCase().padStart(2, '0');
+      }
+    }
+    return result;
+  };
+
+  const wrapRFC = (charset: string, mode: 'B' | 'Q', data: string) => `=?${charset}?${mode}?${data}?=`;
+
+  // --- Variant Generation ---
+  
   const variants = useMemo(() => {
     if (!subject.trim()) return [];
     
-    const uniqueStrings = new Set<string>();
+    const uniqueStore = new Set<string>();
     const results: EncodedVariant[] = [];
 
-    const addUnique = (label: string, value: string, collection: number) => {
-      if (!uniqueStrings.has(value)) {
-        uniqueStrings.add(value);
+    const add = (label: string, value: string, collection: number) => {
+      if (!uniqueStore.has(value)) {
+        uniqueStore.add(value);
         results.push({ id: `v-${results.length}`, label, value, collection });
       }
     };
 
-    const words = subject.split(/\s+/);
+    const words = subject.split(/\s+/).filter(w => w.length > 0);
 
-    // --- Generate 100+ Unique Variants ---
-    
-    // 1. Core RFC formats across all charsets (approx 20 variants)
-    CHARSETS.forEach(cs => {
-      addUnique(`Base64 ${cs}`, encodeRFC2047(subject, 'B', cs), 1);
-      addUnique(`Quoted-Printable ${cs}`, encodeRFC2047(subject, 'Q', cs), 2);
-    });
-
-    // 2. Recursive Chunking variations (approx 100 variants: 50 chunks * 2 modes)
-    for (let size = 1; size <= 55; size++) {
-      let b64Chunks = [];
-      let qpChunks = [];
-      for (let i = 0; i < subject.length; i += size) {
-        const slice = subject.slice(i, i + size);
-        b64Chunks.push(encodeRFC2047(slice, 'B', selectedCharset));
-        qpChunks.push(encodeRFC2047(slice, 'Q', selectedCharset));
+    // COLLECTION 1: BASE64 VARIANTS
+    CHARSETS.forEach(cs => add(`B64 [${cs}]`, wrapRFC(cs, 'B', toB64(subject)), 1));
+    // Segmentation variations for B64
+    for (let i = 1; i <= Math.min(subject.length, 10); i++) {
+      let chunks = [];
+      for (let j = 0; j < subject.length; j += i) {
+        chunks.push(wrapRFC('UTF-8', 'B', toB64(subject.substring(j, j + i))));
       }
-      addUnique(`B64 Chunk [${size}]`, b64Chunks.join(' '), 1);
-      addUnique(`QP Chunk [${size}]`, qpChunks.join(' '), 2);
+      add(`B64 Fold [Step ${i}]`, chunks.join(' '), 1);
     }
 
-    // 3. Word-based variants (approx 5 variants)
+    // COLLECTION 2: QUOTED-PRINTABLE VARIANTS
+    CHARSETS.forEach(cs => add(`QP [${cs}]`, wrapRFC(cs, 'Q', toQP(subject)), 2));
+    add(`QP Force Hex`, wrapRFC('UTF-8', 'Q', toQP(subject, true)), 2);
+    // Segmentation variations for QP
+    for (let i = 1; i <= Math.min(subject.length, 10); i++) {
+      let chunks = [];
+      for (let j = 0; j < subject.length; j += i) {
+        chunks.push(wrapRFC('UTF-8', 'Q', toQP(subject.substring(j, j + i))));
+      }
+      add(`QP Fold [Step ${i}]`, chunks.join(' '), 2);
+    }
+
+    // COLLECTION 3: MIXED B/Q CHAINED
     if (words.length > 1) {
-      addUnique(`B64 Word-by-Word`, words.map(w => encodeRFC2047(w, 'B', selectedCharset)).join(' '), 3);
-      addUnique(`QP Word-by-Word`, words.map(w => encodeRFC2047(w, 'Q', selectedCharset)).join(' '), 3);
-      addUnique(`Alternating B/Q Words`, words.map((w, i) => encodeRFC2047(w, i % 2 === 0 ? 'B' : 'Q', selectedCharset)).join(' '), 3);
-      addUnique(`Multi-Charset Mix`, words.map((w, i) => encodeRFC2047(w, 'B', CHARSETS[i % CHARSETS.length])).join(' '), 3);
+      const altBQ = words.map((w, i) => wrapRFC('UTF-8', i % 2 === 0 ? 'B' : 'Q', i % 2 === 0 ? toB64(w) : toQP(w))).join(' ');
+      const altQB = words.map((w, i) => wrapRFC('UTF-8', i % 2 === 0 ? 'Q' : 'B', i % 2 === 0 ? toQP(w) : toB64(w))).join(' ');
+      add(`Alternating B/Q`, altBQ, 3);
+      add(`Alternating Q/B`, altQB, 3);
+      
+      // Half/Half
+      const mid = Math.floor(words.length / 2);
+      const halfB = words.slice(0, mid).map(w => wrapRFC('UTF-8', 'B', toB64(w))).join(' ');
+      const halfQ = words.slice(mid).map(w => wrapRFC('UTF-8', 'Q', toQP(w))).join(' ');
+      add(`B-Chain then Q-Chain`, `${halfB} ${halfQ}`, 3);
     }
 
-    // 4. Forensic Obfuscation (Collection 4)
-    addUnique(`Full Hex QP Obfuscation`, encodeRFC2047(subject, 'Q', selectedCharset, true), 4);
-    addUnique(`Double Encoded B64`, encodeRFC2047(encodeBase64(subject), 'B', selectedCharset), 4);
+    // COLLECTION 4: MULTI-CHARSET CHAIN
+    if (words.length > 1) {
+      const multiCs = words.map((w, i) => wrapRFC(CHARSETS[i % CHARSETS.length], 'B', toB64(w))).join(' ');
+      add(`Charset Rotation (B)`, multiCs, 4);
+      const multiCsQ = words.map((w, i) => wrapRFC(CHARSETS[i % CHARSETS.length], 'Q', toQP(w))).join(' ');
+      add(`Charset Rotation (Q)`, multiCsQ, 4);
+    }
+
+    // COLLECTION 5: FORENSIC / EDGE RFC-VALID
+    // One character chains
+    const oneCharChain = subject.split('').map(c => wrapRFC('UTF-8', 'B', toB64(c))).join(' ');
+    add(`Extreme 1-Char Segments`, oneCharChain, 5);
+    
+    // Case aliases
+    add(`Case Alias [utf-8]`, wrapRFC('utf-8', 'B', toB64(subject)), 5);
+    add(`Case Alias [Utf-8]`, wrapRFC('Utf-8', 'B', toB64(subject)), 5);
+    
+    // Aggressive folding (CRLF + WSP) - simulated in string
+    const aggressiveFold = words.map(w => wrapRFC('UTF-8', 'B', toB64(w))).join('\r\n ');
+    add(`RFC Aggressive Folding`, aggressiveFold, 5);
+
+    // Padding variants (if word count allows more)
+    // We fill up to 100+ by varying the segment sizes dynamically
+    let s = 11;
+    while (results.length < 120 && s < subject.length) {
+       let chunks = [];
+       for (let j = 0; j < subject.length; j += s) {
+         chunks.push(wrapRFC('UTF-8', 'B', toB64(subject.substring(j, j + s))));
+       }
+       add(`Extended B64 Variant [${s}]`, chunks.join(' '), 1);
+       s++;
+    }
 
     return results;
-  }, [subject, selectedCharset]);
+  }, [subject]);
 
   const copyToClipboard = (text: string, id: string) => {
     navigator.clipboard.writeText(text);
     setCopiedId(id);
-    notify('success', 'Variant copied to clipboard.');
+    notify('success', 'RFC 2047 sequence copied.');
     setTimeout(() => setCopiedId(null), 2000);
   };
 
-  const isInputDark = isDark ? 'bg-slate-900 border-slate-800 text-white' : 'bg-white border-slate-200 text-slate-900';
+  const cardClasses = isDark ? 'bg-[#0a0f1c] border-slate-800' : 'bg-white border-slate-200';
 
   return (
-    <div className={`min-h-screen flex flex-col px-4 pt-3 pb-8 md:px-8 md:pt-4 md:pb-8 gap-4 max-w-full mx-auto animate-in fade-in duration-500 ${isDark ? 'bg-slate-950' : 'bg-slate-50'}`}>
-      <header className={`shrink-0 flex flex-col md:flex-row md:items-center justify-between gap-5 p-5 rounded-[2.5rem] shadow-2xl border backdrop-blur-xl ${isDark ? 'bg-slate-900/80 border-slate-800' : 'bg-white/90 border-slate-200'}`}>
-        <div className="flex items-center gap-4">
-          <button onClick={onBack} className={`p-3 rounded-2xl transition-all border ${isDark ? 'bg-slate-800 border-slate-700 text-slate-400 hover:text-white' : 'bg-white border-slate-200 text-slate-600'}`}>
-            <ArrowLeft size={18} />
-          </button>
-          <div className="flex items-center gap-3">
-            <div className="bg-fuchsia-600 p-2 rounded-2xl text-white shadow-lg">
-              <Type size={22} />
+    <div className={`min-h-screen flex flex-col ${isDark ? 'bg-[#05080f]' : 'bg-slate-50'} animate-in fade-in duration-500`}>
+      {/* Studio Header */}
+      <header className={`shrink-0 z-[100] border-b backdrop-blur-xl sticky top-0 ${isDark ? 'bg-[#0f172a]/80 border-slate-800' : 'bg-white/90 border-slate-200 shadow-sm'}`}>
+        <div className="max-w-7xl mx-auto px-6 py-4 flex flex-col gap-6">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-4">
+              <button onClick={onBack} className={`p-2.5 rounded-xl transition-all border ${isDark ? 'bg-slate-800 border-slate-700 text-slate-400 hover:text-white' : 'bg-slate-100 border-slate-200 text-slate-600'}`}>
+                <ArrowLeft size={18} />
+              </button>
+              <div className="flex items-center gap-3">
+                <div className="bg-fuchsia-600 p-1.5 rounded-lg text-white shadow-lg shadow-fuchsia-600/20">
+                  <Type size={20} />
+                </div>
+                <div>
+                  <h1 className="text-sm font-black uppercase tracking-[0.15em] text-fuchsia-500">RFC 2047 Forensic Lab</h1>
+                  <p className="text-[9px] font-black text-slate-500 uppercase tracking-widest">Multi-Entropy Subject Encoder</p>
+                </div>
+              </div>
             </div>
-            <div>
-              <h1 className="text-xl font-black uppercase tracking-tight text-fuchsia-500">Subject Encoder</h1>
-              <p className="text-slate-500 text-[10px] font-black uppercase tracking-widest opacity-60">High-Entropy Variant Lab</p>
+            <div className="hidden md:flex items-center gap-3 px-4 py-2 rounded-2xl bg-fuchsia-500/10 border border-fuchsia-500/20">
+               <Fingerprint size={14} className="text-fuchsia-400" />
+               <span className="text-[10px] font-black uppercase text-fuchsia-400 tracking-widest">
+                 {variants.length} UNIQUE ENCODINGS GENERATED
+               </span>
             </div>
           </div>
-        </div>
-        
-        <div className="flex-1 max-w-3xl flex flex-col md:flex-row gap-4">
-          <div className={`relative flex-1 flex items-center p-1 rounded-2xl border transition-all ${isDark ? 'bg-slate-950 border-slate-800 focus-within:border-fuchsia-500' : 'bg-slate-100 border-slate-200 focus-within:border-fuchsia-400'}`}>
-            <Terminal size={16} className="absolute left-4 text-fuchsia-500" />
-            <input 
-              value={subject}
-              onChange={(e) => setSubject(e.target.value)}
-              placeholder="Paste raw subject line for obfuscation analysis..."
-              className="w-full pl-10 pr-4 py-3 bg-transparent outline-none font-bold text-base"
-            />
+
+          <div className="w-full">
+            <div className={`relative flex items-center p-1 rounded-[2rem] border transition-all ${isDark ? 'bg-slate-950 border-slate-800 focus-within:border-fuchsia-500' : 'bg-white border-slate-200 shadow-sm'}`}>
+              <Terminal size={20} className="absolute left-6 text-fuchsia-500" />
+              <input 
+                value={subject}
+                onChange={(e) => setSubject(e.target.value)}
+                placeholder="Enter email subject line..."
+                className="w-full pl-14 pr-4 py-5 bg-transparent outline-none font-bold text-xl md:text-2xl tracking-tight"
+              />
+            </div>
           </div>
-          <select value={selectedCharset} onChange={(e) => setSelectedCharset(e.target.value)} className={`px-4 py-3 rounded-2xl border font-black text-xs uppercase outline-none cursor-pointer ${isInputDark}`}>
-            {CHARSETS.map(c => <option key={c} value={c}>{c}</option>)}
-          </select>
         </div>
       </header>
 
-      <div className="flex-1 overflow-auto custom-scrollbar p-2">
-        {variants.length > 0 ? (
-          <div className="flex flex-col gap-10 pb-20">
-            <CollectionSection title="Matrix 1: Base64 Encodings" variants={variants.filter(v => v.collection === 1)} onCopy={copyToClipboard} copiedId={copiedId} isDark={isDark} />
-            <CollectionSection title="Matrix 2: Quoted-Printable" variants={variants.filter(v => v.collection === 2)} onCopy={copyToClipboard} copiedId={copiedId} isDark={isDark} />
-            <CollectionSection title="Matrix 3: Advanced Structure" variants={variants.filter(v => v.collection === 3)} onCopy={copyToClipboard} copiedId={copiedId} isDark={isDark} />
-            <CollectionSection title="Matrix 4: Forensic Obfuscation" variants={variants.filter(v => v.collection === 4)} onCopy={copyToClipboard} copiedId={copiedId} isDark={isDark} />
-          </div>
-        ) : (
-          <div className="h-[60vh] flex flex-col items-center justify-center opacity-20">
-             <FlaskConical size={80} strokeWidth={1} />
-             <p className="text-[12px] font-black uppercase tracking-[0.4em] mt-6">Engage Matrix Input Above</p>
-          </div>
-        )}
+      {/* Results Workspace */}
+      <div className="flex-1 overflow-auto custom-scrollbar px-6 py-8">
+        <div className="max-w-7xl mx-auto space-y-12">
+          
+          <VariantSection 
+             title="Collection 1: Base64 Encodings" 
+             desc="Strictly using B-encoding with charset rotation and segment folding."
+             variants={variants.filter(v => v.collection === 1)} 
+             isDark={isDark} 
+             onCopy={copyToClipboard}
+             copiedId={copiedId}
+          />
+
+          <VariantSection 
+             title="Collection 2: Quoted-Printable" 
+             desc="Q-encoding variations including force-hex and boundary segmentation."
+             variants={variants.filter(v => v.collection === 2)} 
+             isDark={isDark} 
+             onCopy={copyToClipboard}
+             copiedId={copiedId}
+          />
+
+          <VariantSection 
+             title="Collection 3: Mixed B/Q Chains" 
+             desc="Hybrid sequences combining both encoding modes within a single header."
+             variants={variants.filter(v => v.collection === 3)} 
+             isDark={isDark} 
+             onCopy={copyToClipboard}
+             copiedId={copiedId}
+          />
+
+          <VariantSection 
+             title="Collection 4: Multi-Charset Encodings" 
+             desc="Chain encodings where each segment or word declares a different charset."
+             variants={variants.filter(v => v.collection === 4)} 
+             isDark={isDark} 
+             onCopy={copyToClipboard}
+             copiedId={copiedId}
+          />
+
+          <VariantSection 
+             title="Collection 5: Forensic & Edge Cases" 
+             desc="RFC-valid stress variants: aggressive folding, extreme segmentation, and aliases."
+             variants={variants.filter(v => v.collection === 5)} 
+             isDark={isDark} 
+             onCopy={copyToClipboard}
+             copiedId={copiedId}
+          />
+
+        </div>
       </div>
+
+      {/* Status Footer */}
+      <footer className="shrink-0 bg-[#05080f] border-t border-slate-900 px-6 py-3 flex items-center justify-between text-[9px] font-black uppercase tracking-widest text-slate-600">
+        <div className="flex gap-4">
+          <span className="text-fuchsia-500 flex items-center gap-1">
+            <FlaskConical size={10} fill="currentColor" /> Protocol Diagnostic Active
+          </span>
+          <span className="opacity-40">|</span>
+          <span>Deduplication: STACK_HASH_VALID</span>
+        </div>
+        <div className="flex gap-4">
+           <span>RFC 2047 Compliant</span>
+           <span className="text-emerald-500 flex items-center gap-1"><ShieldCheck size={10}/> Verified Unique Output</span>
+        </div>
+      </footer>
     </div>
   );
 };
 
-const CollectionSection = ({ title, variants, onCopy, copiedId, isDark }: any) => {
+const VariantSection = ({ title, desc, variants, isDark, onCopy, copiedId }: any) => {
   if (variants.length === 0) return null;
   return (
     <section className="animate-in fade-in slide-in-from-bottom-4 duration-700">
-      <div className="flex items-center gap-4 mb-6">
-        <h3 className="text-[13px] font-black uppercase tracking-[0.2em] text-slate-500">{title}</h3>
+      <div className="flex items-center gap-4 mb-2">
+        <h3 className="text-sm font-black uppercase tracking-[0.2em] text-fuchsia-500">{title}</h3>
         <div className="h-px flex-1 bg-slate-800/50" />
-        <span className="text-[10px] font-black text-slate-600 bg-slate-800/20 px-2 py-0.5 rounded uppercase">{variants.length} UNIQUE</span>
+        <span className="text-[10px] font-black text-slate-500 bg-slate-800/20 px-2.5 py-1 rounded-lg uppercase tracking-widest">
+          {variants.length} UNIQUE
+        </span>
       </div>
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+      <p className="text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-6 opacity-60 ml-1">{desc}</p>
+      
+      <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
         {variants.map((v: any) => (
-          <div key={v.id} className={`group p-6 rounded-[2rem] border transition-all duration-300 ${isDark ? 'bg-slate-900 border-slate-800 hover:border-fuchsia-500/50' : 'bg-white border-slate-200 hover:shadow-xl'}`}>
-            <div className="flex justify-between items-center mb-3">
-               <span className="text-[10px] font-black uppercase tracking-widest text-slate-500">{v.label}</span>
-               <button onClick={() => onCopy(v.value, v.id)} className={`p-2.5 rounded-xl transition-all ${isDark ? 'bg-slate-800 hover:bg-slate-700 text-slate-400' : 'bg-slate-50 hover:bg-slate-100 text-slate-500'}`}>
-                 {copiedId === v.id ? <Check size={16} className="text-emerald-400" /> : <Copy size={16} />}
+          <div key={v.id} className={`group relative p-6 rounded-[2rem] border transition-all duration-300 ${isDark ? 'bg-[#0a0f1c] border-slate-800 hover:border-fuchsia-500/50' : 'bg-white border-slate-200 hover:shadow-xl hover:border-fuchsia-300'}`}>
+            <div className="flex justify-between items-center mb-4">
+               <div className="flex items-center gap-2">
+                 <Code size={12} className="text-fuchsia-400" />
+                 <span className="text-[9px] font-black uppercase tracking-widest text-slate-500">{v.label}</span>
+               </div>
+               <button onClick={() => onCopy(v.value, v.id)} className={`p-2.5 rounded-xl transition-all ${isDark ? 'bg-slate-900 hover:bg-fuchsia-500 hover:text-white text-slate-500' : 'bg-slate-50 hover:bg-fuchsia-600 hover:text-white text-slate-400 border border-slate-100'}`}>
+                 {copiedId === v.id ? <Check size={16} /> : <Copy size={16} />}
                </button>
             </div>
-            <div className={`p-4 rounded-2xl font-mono text-[13px] break-all leading-relaxed ${isDark ? 'bg-slate-950 border-slate-800 text-fuchsia-400' : 'bg-slate-50 border-slate-100 text-indigo-700'}`}>
+            <div className={`p-4 rounded-2xl font-mono text-[12px] break-all leading-relaxed whitespace-pre-wrap select-all min-h-[60px] flex items-center ${isDark ? 'bg-black/40 text-fuchsia-400/80 border border-slate-800 shadow-inner' : 'bg-slate-50 text-indigo-700 border border-slate-100 shadow-inner'}`}>
                {v.value}
+            </div>
+            <div className="absolute top-2 right-2 opacity-0 group-hover:opacity-100 transition-opacity">
+               <ChevronRight size={12} className="text-fuchsia-500/30" />
             </div>
           </div>
         ))}

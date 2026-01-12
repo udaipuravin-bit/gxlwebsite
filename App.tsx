@@ -21,12 +21,13 @@ import GrapesBuilderTool from './components/GrapesBuilderTool';
 import StripoBuilderTool from './components/StripoBuilderTool';
 import FontStudioTool from './components/FontStudioTool';
 import CaaTool from './components/CaaTool';
+import SelectorAuditorTool from './components/SelectorAuditorTool';
 import { X, CheckCircle2, AlertCircle, Info, AlertTriangle } from 'lucide-react';
 
 export type View = 
   | 'home' 
   | 'bulk-blacklist' | 'spamhaus-checker'
-  | 'dkim-checker' | 'spf-validator' | 'dmarc-checker' | 'caa-checker'
+  | 'dkim-checker' | 'spf-validator' | 'dmarc-checker' | 'caa-checker' | 'selector-auditor'
   | 'dns-lookup' | 'mx-lookup' | 'reverse-dns' | 'ip-geolocation' | 'whois-checker'
   | 'font-studio' | 'email-builder' | 'grapes-builder' | 'stripo-builder' | 'email-master' | 'html-cleaner'
   | 'email-header-analyzer' | 'mime-encoder' | 'subject-encoder';
@@ -55,6 +56,7 @@ export const useNotify = () => {
 
 const App: React.FC = () => {
   const [currentView, setCurrentView] = useState<View>('home');
+  const [viewData, setViewData] = useState<any>(null);
   const [theme, setTheme] = useState<Theme>('dark');
   const [notifications, setNotifications] = useState<Notification[]>([]);
 
@@ -76,7 +78,8 @@ const App: React.FC = () => {
 
   const isDark = theme === 'dark';
 
-  const navigate = (view: View) => {
+  const navigate = (view: View, data: any = null) => {
+    setViewData(data);
     setCurrentView(view);
     window.scrollTo({ top: 0, behavior: 'smooth' });
   };
@@ -101,6 +104,7 @@ const App: React.FC = () => {
           {/* Security & Reputation */}
           {currentView === 'bulk-blacklist' && <BulkBlacklistTool theme={theme} onBack={() => navigate('home')} />}
           {currentView === 'spamhaus-checker' && <SpamhausTool theme={theme} onBack={() => navigate('home')} />}
+          {currentView === 'selector-auditor' && <SelectorAuditorTool theme={theme} onBack={() => navigate('home')} onPushMime={(payload) => navigate('mime-encoder', payload)} />}
           
           {/* Authentication */}
           {currentView === 'dkim-checker' && <DkimTool theme={theme} onBack={() => navigate('home')} />}
@@ -123,7 +127,7 @@ const App: React.FC = () => {
           {currentView === 'email-master' && <EmailMasterTool theme={theme} onBack={() => navigate('home')} />}
           {currentView === 'html-cleaner' && <HtmlCleanerTool theme={theme} onBack={() => navigate('home')} />}
           {currentView === 'email-header-analyzer' && <EmailHeaderTool theme={theme} onBack={() => navigate('home')} />}
-          {currentView === 'mime-encoder' && <MimeEncoderTool theme={theme} onBack={() => navigate('home')} />}
+          {currentView === 'mime-encoder' && <MimeEncoderTool theme={theme} onBack={() => navigate('home')} initialData={viewData} />}
           {currentView === 'subject-encoder' && <SubjectEncoderTool theme={theme} onBack={() => navigate('home')} />}
         </main>
 

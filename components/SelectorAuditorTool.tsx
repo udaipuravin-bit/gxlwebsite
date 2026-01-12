@@ -11,7 +11,8 @@ import {
   Filter,
   Copy,
   Check,
-  Fingerprint
+  Fingerprint,
+  Monitor
 } from 'lucide-react';
 import { DkimResult } from '../types';
 import { useNotify } from '../App';
@@ -21,7 +22,13 @@ interface AuditorEntry extends DkimResult {
   matchStatus: 'match' | 'mismatch' | 'missing' | 'loading' | 'pending' | 'error';
 }
 
-const SelectorAuditorTool: React.FC<{ onBack: () => void; theme: 'dark' | 'light' }> = ({ onBack, theme }) => {
+interface SelectorAuditorProps {
+  onBack: () => void;
+  theme: 'dark' | 'light';
+  onPushMime?: (payload: string) => void;
+}
+
+const SelectorAuditorTool: React.FC<SelectorAuditorProps> = ({ onBack, theme, onPushMime }) => {
   const { notify } = useNotify();
   const isDark = theme === 'dark';
   
@@ -108,19 +115,19 @@ const SelectorAuditorTool: React.FC<{ onBack: () => void; theme: 'dark' | 'light
         <div className="lg:col-span-4 flex flex-col gap-6">
           <div className={`p-6 rounded-[2rem] border flex flex-col gap-4 ${cardClasses}`}>
             <div>
-               <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest flex items-center gap-2 mb-2"><Globe size={12}/> Target Domains</label>
+               <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest flex items-center gap-2 mb-2"><Globe size={12}/> Target Domains (Matrix)</label>
                <textarea value={domainsInput} onChange={(e) => setDomainsInput(e.target.value)} placeholder="google.com" className={`w-full h-32 p-4 border rounded-2xl outline-none font-mono text-xs resize-none transition-all ${inputClasses}`} />
             </div>
             <div>
-               <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest flex items-center gap-2 mb-2"><Layers size={12}/> Selectors (CSV)</label>
-               <input type="text" value={selectorInput} onChange={(e) => setSelectorInput(e.target.value)} placeholder="default, google" className={`w-full p-4 border rounded-2xl outline-none font-bold text-xs ${inputClasses}`} />
+               <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest flex items-center gap-2 mb-2"><Layers size={12}/> Active Selectors (CSV)</label>
+               <input type="text" value={selectorInput} onChange={(e) => setSelectorInput(e.target.value)} placeholder="default, google, s1" className={`w-full p-4 border rounded-2xl outline-none font-bold text-xs ${inputClasses}`} />
             </div>
             <div>
-               <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest flex items-center gap-2 mb-2"><Fingerprint size={12}/> Match Pattern</label>
+               <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest flex items-center gap-2 mb-2"><Fingerprint size={12}/> Diagnostic Match Pattern</label>
                <input type="text" value={matchPattern} onChange={(e) => setMatchPattern(e.target.value)} placeholder="p=" className={`w-full p-4 border rounded-2xl outline-none font-bold text-xs ${inputClasses}`} />
             </div>
             <button onClick={handleAudit} disabled={isProcessing} className="w-full py-4 bg-orange-600 hover:bg-orange-500 text-white rounded-2xl font-black uppercase tracking-widest text-[10px] shadow-lg disabled:opacity-50 flex items-center justify-center gap-2 transition-all">
-              {isProcessing ? <><Loader2 size={16} className="animate-spin" /> Auditing...</> : <><Zap size={16} /> Run Logic Scan</>}
+              {isProcessing ? <><Loader2 size={16} className="animate-spin" /> AUDITING...</> : <><Zap size={16} /> RUN LOGIC SCAN</>}
             </button>
           </div>
         </div>
@@ -148,10 +155,10 @@ const SelectorAuditorTool: React.FC<{ onBack: () => void; theme: 'dark' | 'light
               <thead>
                 <tr className={`${isDark ? 'bg-[#05080f] border-[#1e293b]' : 'bg-slate-100 border-slate-200'} border-b text-[10px] font-black uppercase tracking-widest text-slate-600`}>
                   <th className="px-6 py-4 w-12 text-center">ID</th>
-                  <th className="px-6 py-4">Domain</th>
+                  <th className="px-6 py-4">Domain Node</th>
                   <th className="px-6 py-4">Selector</th>
                   <th className="px-6 py-4 text-center">Status</th>
-                  <th className="px-6 py-4">Record Output</th>
+                  <th className="px-6 py-4">Forensic Actions</th>
                 </tr>
               </thead>
               <tbody className={`divide-y ${isDark ? 'divide-[#1e293b]' : 'divide-slate-100'}`}>
@@ -164,19 +171,24 @@ const SelectorAuditorTool: React.FC<{ onBack: () => void; theme: 'dark' | 'light
                        <span className={`px-2 py-0.5 rounded text-[8px] font-black border uppercase ${r.matchStatus === 'match' ? 'bg-emerald-500/10 text-emerald-500 border-emerald-500/20' : 'bg-rose-500/10 text-rose-500 border-rose-500/20'}`}>{r.matchStatus}</span>
                     </td>
                     <td className="px-6 py-4">
-                       {r.record ? (
-                         <div className="flex items-center gap-2 max-w-sm">
-                           <code className={`text-sm font-mono p-3 rounded-xl truncate flex-1 border ${isDark ? 'bg-slate-950 border-slate-800 text-orange-400 shadow-inner' : 'bg-slate-100 border-slate-100 text-orange-700 shadow-inner'}`}>
-                             {r.record}
-                           </code>
-                           <button onClick={() => { navigator.clipboard.writeText(r.record); setCopiedId(r.id); setTimeout(() => setCopiedId(null), 2000); }} className="p-2.5 bg-slate-900/50 rounded-lg transition-colors hover:bg-slate-800">
+                       <div className="flex items-center gap-2">
+                          {r.record && (
+                            <code className={`text-[10px] font-mono p-2 rounded-lg truncate max-w-[120px] border ${isDark ? 'bg-slate-950 border-slate-800 text-orange-400/60' : 'bg-slate-100 border-slate-100 text-orange-700/60'}`}>
+                              {r.record}
+                            </code>
+                          )}
+                          <button onClick={() => { navigator.clipboard.writeText(r.record); setCopiedId(r.id); setTimeout(() => setCopiedId(null), 2000); }} className="p-2 bg-slate-900/50 rounded-lg transition-colors hover:bg-slate-800" title="Copy Record">
                               {copiedId === r.id ? <Check size={14} className="text-emerald-500" /> : <Copy size={14} className="text-slate-400" />}
-                           </button>
-                         </div>
-                       ) : <span className="text-xs text-slate-700 italic opacity-40">—</span>}
+                          </button>
+                          {r.record && onPushMime && (
+                            <button onClick={() => onPushMime(r.record)} className="p-2 bg-orange-600/10 text-orange-500 rounded-lg transition-all hover:bg-orange-600 hover:text-white" title="Analyze in MIME Forensic Studio">
+                               <Monitor size={14} />
+                            </button>
+                          )}
+                       </div>
                     </td>
                   </tr>
-                )) : <tr><td colSpan={5} className="px-6 py-32 text-center text-slate-600 opacity-20 uppercase font-black text-xs tracking-widest">No matching results</td></tr>}
+                )) : <tr><td colSpan={5} className="px-6 py-32 text-center text-slate-600 opacity-20 uppercase font-black text-xs tracking-widest">Awaiting Domain Analysis</td></tr>}
               </tbody>
             </table>
           </div>
